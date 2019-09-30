@@ -17,6 +17,12 @@ $ gcloud app browse
 
 # Testing
 
+Locally:
+
+~~~
+curl -v "http://localhost:8080/dns-query?dns=YXBwbGUuY29t"
+~~~
+
 
 After deployment:
 

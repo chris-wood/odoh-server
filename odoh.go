@@ -28,6 +28,8 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 		elapsed  time.Duration
 	)
 
+	log.Println("Handling /odoh request")
+
 	switch r.Method {
 	case "GET":
 		encoded := r.URL.Query().Get("dns")
@@ -57,7 +59,8 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		// parse the dns message
+
+		// Parse the DNS message
 		msg := &dns.Msg{}
 		if err := msg.Unpack(body); err != nil {
 			log.Println(err)
@@ -85,8 +88,9 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	if err == dnsr.NXDOMAIN {
 		err = nil
 	}
+
 	if err != nil {
-		log.Printf("%s Request for <%s/%s> %s\n", r.Method, n, t, err.Error())
+		log.Printf("%s Request for %s [%s] %s\n", r.Method, n, t, err.Error())
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -101,6 +105,11 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 		response.Answer = append(response.Answer, newRR)
 	}
+
+	if s.verbose {
+		log.Println("Answer: ", response.Answer)
+	}
+
 	packed, err = response.Pack()
 	if err != nil {
 		log.Println(err)
@@ -111,11 +120,13 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	if s.verbose {
 		log.Printf("%s Request for <%s/%s> (%s)\n", r.Method, n, t, elapsed.String())
 	}
+
 	w.Header().Set("Content-Type", "application/dns-message")
 	w.Write(packed)
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received / request")
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -124,6 +135,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received /health request")
 	fmt.Fprint(w, "ok")
 }
 
@@ -136,9 +148,9 @@ func main() {
 		timeout: timeout,
 	}
 
-	http.HandleFunc("/", handle)
-	http.HandleFunc("/odoh", server.queryHandler)
+	http.HandleFunc("/dns-query", server.queryHandler)
 	http.HandleFunc("/health", healthCheckHandler)
+	http.HandleFunc("/", handle)
 
 	log.Print("Listening on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
