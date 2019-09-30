@@ -122,7 +122,8 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.verbose {
-		log.Printf("%s Request for <%s/%s> (%s)\n", r.Method, n, t, elapsed.String())
+		log.Printf("%s Request: <%s/%s> (%s)\n", r.Method, n, t, elapsed.String())
+		log.Printf("%s Response: %x\n", r.Method, packed)
 	}
 
 	w.Header().Set("Content-Type", "application/dns-message")
