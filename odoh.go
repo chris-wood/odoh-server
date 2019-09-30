@@ -19,10 +19,56 @@ type odohServer struct {
 	resolver *dnsr.Resolver
 }
 
+func (s *odohServer) parseRequestFromGET(r *http.Request) (string, string, error) {
+	encoded := r.URL.Query().Get("dns")
+	if encoded == "" {
+		return "", "", fmt.Errorf("missing dns query parameter in GET request")
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", "", err
+	}
+	
+	// TOOD(caw): we need to figure out the right type of query to use for a response
+	return string(decoded), "A", nil
+}
+
+func (s *odohServer) parseRequestFromPOST(r *http.Request) (string, string, error) {
+	if r.Header.Get("Content-Type") != "application/dns-message" {
+		return "", "", fmt.Errorf("incorrect content type, expected 'application/dns-message', got %s", r.Header.Get("Content-Type"))
+	}
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Parse the DNS message
+	msg := &dns.Msg{}
+	if err := msg.Unpack(body); err != nil {
+		return "", "", err
+	}
+	if len(msg.Question) != 1 {
+		return "", "", err
+	}
+
+	return msg.Question[0].Name, dns.Type(msg.Question[0].Qtype).String(), nil
+}
+
+func (s *odohServer) parseRequest(r *http.Request) (string, string, error) {
+	switch r.Method {
+	case "GET":
+		return s.parseRequestFromGET(r)
+	case "POST":
+		return s.parseRequestFromPOST(r)
+	default:
+		return "", "", fmt.Errorf("unsupported HTTP method")
+	}
+}
+
 func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	var (
-		err      error
-		n, t     string
 		response dns.Msg
 		packed   []byte
 		elapsed  time.Duration
@@ -30,51 +76,9 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Handling /odoh request")
 
-	switch r.Method {
-	case "GET":
-		encoded := r.URL.Query().Get("dns")
-		if encoded == "" {
-			log.Println("missing dns query parameter in GET request")
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-
-		decoded, err := base64.RawURLEncoding.DecodeString(encoded)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-		n = string(decoded)
-		t = "A"
-	case "POST":
-		if r.Header.Get("Content-Type") != "application/dns-message" {
-			http.Error(w, http.StatusText(http.StatusUnsupportedMediaType), http.StatusUnsupportedMediaType)
-			return
-		}
-		defer r.Body.Close()
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-
-		// Parse the DNS message
-		msg := &dns.Msg{}
-		if err := msg.Unpack(body); err != nil {
-			log.Println(err)
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-		if len(msg.Question) != 1 {
-			log.Println("DoH only supports single queries")
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-		n = msg.Question[0].Name
-		t = dns.Type(msg.Question[0].Qtype).String()
-	default:
+	n, t, err := s.parseRequest(r)
+	if err != nil {
+		log.Println(err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
