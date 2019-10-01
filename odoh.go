@@ -1,27 +1,28 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
-	"io/ioutil"
 	"fmt"
+	"github.com/miekg/dns"
+	"io/ioutil"
 	"log"
-	"time"
 	"net"
 	"net/http"
-	"github.com/miekg/dns"
+	"time"
 )
 
 type odohServer struct {
-	verbose  bool
+	verbose    bool
 	nameserver string
-	timeout time.Duration
+	timeout    time.Duration
 	connection *dns.Conn
 }
 
 func (s *odohServer) startConnection(nameserver string, timeout time.Duration) error {
 	s.connection = new(dns.Conn)
 	var err error
-	if s.connection.Conn, err = net.DialTimeout("tcp", nameserver, timeout * time.Millisecond); err != nil {
+	if s.connection.Conn, err = net.DialTimeout("tcp", nameserver, timeout*time.Millisecond); err != nil {
 		return fmt.Errorf("Failed starting resolver connection")
 	}
 
@@ -67,7 +68,7 @@ func (s *odohServer) parseRequestFromGET(r *http.Request) (string, string, uint1
 	if len(msg.Question) != 1 {
 		return "", "", uint16(0), err
 	}
-	
+
 	return msg.Question[0].Name, dns.Type(msg.Question[0].Qtype).String(), msg.Id, nil
 }
 
@@ -109,8 +110,8 @@ func (s *odohServer) parseRequest(r *http.Request) (string, string, uint16, erro
 }
 
 func createQuery(n, t string) *dns.Msg {
-	queryMessage := &dns.Msg {
-		MsgHdr: dns.MsgHdr {
+	queryMessage := &dns.Msg{
+		MsgHdr: dns.MsgHdr{
 			Opcode: dns.OpcodeQuery,
 		},
 		Question: make([]dns.Question, 1),
@@ -122,8 +123,8 @@ func createQuery(n, t string) *dns.Msg {
 	}
 
 	queryMessage.Question[0] = dns.Question{
-		Name: dns.Fqdn(n), 
-		Qtype: qtype,
+		Name:   dns.Fqdn(n),
+		Qtype:  qtype,
 		Qclass: uint16(dns.ClassINET),
 	}
 	queryMessage.Id = dns.Id()
@@ -134,7 +135,7 @@ func createQuery(n, t string) *dns.Msg {
 }
 
 func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Handling /odoh request")
+	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
 	n, t, id, err := s.parseRequest(r)
 	if err != nil {
@@ -142,9 +143,14 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-			
+
 	if s.verbose {
-		log.Printf("%s Resolving: %s %s %d", r.Method, n, t, id)
+		log.Printf("%s Resolving: %s %s %d\n", r.Method, n, t, id)
+	}
+
+	host := r.Header.Get("Host")
+	if s.verbose {
+		log.Printf("%s Request host='%s'\n", r.Method, host)
 	}
 
 	query := createQuery(n, t)
@@ -157,6 +163,7 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response.Id = id
 	packed, err := response.Pack()
 	if err != nil {
 		log.Println("Failed packing answers:", err)
@@ -175,28 +182,76 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(packed)
 }
 
-func handle(w http.ResponseWriter, r *http.Request) {
-	log.Println("Received / request")
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+func (s *odohServer) proxyHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
+
+	if r.Method != "POST" {
+		log.Println("Unsupported method for %s", r.URL.Path)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+
+	if r.Header.Get("Content-Type") != "application/oblivious-dns-message" {
+		log.Printf("incorrect content type, expected 'application/oblivious-dns-message', got %s\n", r.Header.Get("Content-Type"))
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	targetName := r.URL.Query().Get("target")
+	if targetName == "" {
+		log.Println("Missing proxy target query parameter in POST request")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Println("Missing proxy message body in POST request")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	req, err := http.NewRequest("POST", targetName, bytes.NewReader(body))
+	if err != nil {
+		log.Println("Failed creating target POST request")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Content-Type", "application/dns-message")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Failed to send proxied message")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := ioutil.ReadAll(resp.Body)
+	w.Header().Set("Content-Type", "application/oblivious-dns-message")
+	w.Write(responseBody)
+}
+
+func handle(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 	fmt.Fprint(w, "ODOH, try /dns-query instead!")
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Received /health request")
+	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 	fmt.Fprint(w, "ok")
 }
 
 func main() {
 	timeout := 2500 * time.Millisecond
-	server := odohServer {
-		verbose: true,
-		timeout: timeout,
+	server := odohServer{
+		verbose:    true,
+		timeout:    timeout,
 		nameserver: "1.1.1.1:53",
 	}
 
+	http.HandleFunc("/dns-query/proxy", server.proxyHandler)
 	http.HandleFunc("/dns-query", server.queryHandler)
 	http.HandleFunc("/health", healthCheckHandler)
 	http.HandleFunc("/", handle)
