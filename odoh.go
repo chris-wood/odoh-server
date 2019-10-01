@@ -8,21 +8,51 @@ import (
 	"time"
 	"net"
 	"net/http"
-	"github.com/domainr/dnsr"
 	"github.com/miekg/dns"
 )
 
 type odohServer struct {
 	verbose  bool
-	upstream *net.UDPAddr
-	timeout  time.Duration
-	resolver *dnsr.Resolver
+	nameserver string
+	timeout time.Duration
+	connection *dns.Conn
+}
+
+func (s *odohServer) startConnection(nameserver string, timeout time.Duration) error {
+	s.connection = new(dns.Conn)
+	var err error
+	if s.connection.Conn, err = net.DialTimeout("tcp", nameserver, timeout * time.Millisecond); err != nil {
+		return fmt.Errorf("Failed starting resolver connection")
+	}
+
+	return nil
+}
+
+func (s *odohServer) resolve(msg *dns.Msg) (*dns.Msg, error) {
+	err := s.startConnection(s.nameserver, s.timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	s.connection.SetReadDeadline(time.Now().Add(s.timeout * time.Millisecond))
+	s.connection.SetWriteDeadline(time.Now().Add(s.timeout * time.Millisecond))
+
+	if err := s.connection.WriteMsg(msg); err != nil {
+		return nil, err
+	}
+
+	response, err := s.connection.ReadMsg()
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (s *odohServer) parseRequestFromGET(r *http.Request) (string, string, uint16, error) {
 	encoded := r.URL.Query().Get("dns")
 	if encoded == "" {
-		return "", "", uint16(0), fmt.Errorf("missing dns query parameter in GET request")
+		return "", "", uint16(0), fmt.Errorf("Missing DNS query parameter in GET request")
 	}
 
 	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
@@ -78,25 +108,10 @@ func (s *odohServer) parseRequest(r *http.Request) (string, string, uint16, erro
 	}
 }
 
-func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Handling /odoh request")
-
-	n, t, id, err := s.parseRequest(r)
-	if err != nil {
-		log.Println("Failed parsing request:", err)
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-
-	start := time.Now()
-			
-	if s.verbose {
-		log.Printf("%s Resolving: %s %s %d", r.Method, n, t, id)
-	}
-
-	queryMessage := &dns.Msg{
-		MsgHdr: dns.MsgHdr{
-			Opcode:            dns.OpcodeQuery,
+func createQuery(n, t string) *dns.Msg {
+	queryMessage := &dns.Msg {
+		MsgHdr: dns.MsgHdr {
+			Opcode: dns.OpcodeQuery,
 		},
 		Question: make([]dns.Question, 1),
 	}
@@ -115,67 +130,32 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	queryMessage.Rcode = dns.RcodeSuccess
 	queryMessage.RecursionDesired = true
 
-	connection := new(dns.Conn)
-	if connection.Conn, err = net.DialTimeout("tcp", "1.1.1.1:53", 2*time.Second); err != nil {
-		log.Println("Failed connecting to 1.1.1.1:", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	connection.SetReadDeadline(time.Now().Add(2 * time.Second))
-	connection.SetWriteDeadline(time.Now().Add(2 * time.Second))
+	return queryMessage
+}
 
-	if err := connection.WriteMsg(queryMessage); err != nil {
-		log.Println("Failed sending query:", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	response, err := connection.ReadMsg()
+func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Handling /odoh request")
+
+	n, t, id, err := s.parseRequest(r)
 	if err != nil {
-		log.Println("Failed reading response:", err)
+		log.Println("Failed parsing request:", err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+			
+	if s.verbose {
+		log.Printf("%s Resolving: %s %s %d", r.Method, n, t, id)
+	}
+
+	query := createQuery(n, t)
+	start := time.Now()
+	response, err := s.resolve(query)
+	elapsed := time.Now().Sub(start)
+	if err != nil {
+		log.Println("Query failed:", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	response.Id = id
-
-	elapsed := time.Now().Sub(start)
-
-	// c := new(dns.Client)
-	// t := new(dns.Transfer)
-
-	// rrs, err := s.resolver.ResolveErr(n, t)
-	// if err == dnsr.NXDOMAIN {
-	// 	err = nil
-	// }
-
-	// if err != nil {
-	// 	log.Printf("%s Request for %s [%s] %d %s\n", r.Method, n, t, id, err.Error())
-	// 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// response := dns.Msg {
-	// 	MsgHdr: dns.MsgHdr {
-	// 		Id: id,
-	// 		Response: true,
-	// 		Opcode: dns.OpcodeQuery,
-	// 		Rcode: dns.RcodeSuccess,
-	// 	},
-	// }
-
-	// for _, rr := range rrs {
-	// 	newRR, err := dns.NewRR(rr.String())
-	// 	if err == nil {
-	// 		response.Answer = append(response.Answer, newRR)	
-	// 	} else {
-	// 		log.Println("Failed creating RR from answer set:", err)
-	// 	}
-	// }
-
-	// if len(response.Answer) == 0 {
-	// 	log.Println("Unable to build answer set")
-	// 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	// 	return
-	// }
 
 	packed, err := response.Pack()
 	if err != nil {
@@ -201,7 +181,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	fmt.Fprint(w, "ODOH!")
+	fmt.Fprint(w, "ODOH, try /dns-query instead!")
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -210,12 +190,11 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	timeout := 2500*time.Millisecond
-	capacity := 1000000
+	timeout := 2500 * time.Millisecond
 	server := odohServer {
 		verbose: true,
-		resolver: dnsr.NewWithTimeout(capacity, timeout),
 		timeout: timeout,
+		nameserver: "1.1.1.1:53",
 	}
 
 	http.HandleFunc("/dns-query", server.queryHandler)
