@@ -111,8 +111,9 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 		Qtype: qtype,
 		Qclass: uint16(dns.ClassINET),
 	}
-	queryMessage.Id = id
+	queryMessage.Id = dns.Id()
 	queryMessage.Rcode = dns.RcodeSuccess
+	queryMessage.RecursionDesired = true
 
 	connection := new(dns.Conn)
 	if connection.Conn, err = net.DialTimeout("tcp", "1.1.1.1:53", 2*time.Second); err != nil {
@@ -170,11 +171,11 @@ func (s *odohServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	// 	}
 	// }
 
-	if len(response.Answer) == 0 {
-		log.Println("Unable to build answer set")
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
+	// if len(response.Answer) == 0 {
+	// 	log.Println("Unable to build answer set")
+	// 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	packed, err := response.Pack()
 	if err != nil {
