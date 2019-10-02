@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"encoding/hex"
 	"net/http"
 	"time"
 	"github.com/chris-wood/odoh"
+	"github.com/bifurcation/hpke"
 )
 
 
@@ -20,12 +22,35 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
 }
 
+const (
+	kemID = hpke.DHKEM_X25519
+	kdfID = hpke.KDF_HKDF_SHA256
+	aeadID = hpke.AEAD_AESGCM128
+	pkRm = "85023a65b2c505cd2e92e2c427ef69df8aa8d0f18081a8090b159aafa6001413"
+	skRm = "c2dd775b50210ad308e43b3dd45c5eabc085df1398c8dce6501598c1575dbd21"
+)
+
 func main() {
-	timeout := 2500 * time.Millisecond
+	publicKeyBytes, err := hex.DecodeString(pkRm)
+	if err != nil {
+		log.Fatal("Failed to decode public key. Exiting now.")
+	}
+
+	secretKeyBytes, err := hex.DecodeString(skRm)
+	if err != nil {
+		log.Fatal("Failed to decode private key. Exiting now.")
+	}
+
+	privateKey, err  := odoh.CreatePrivateKeyDeterministic(kemID, kdfID, aeadID, publicKeyBytes, secretKeyBytes)
+	if err != nil {
+		log.Fatal("Failed to create a private key. Exiting now.")
+	}
+
 	server := odoh.Server{
 		Verbose:    true,
-		Timeout:    timeout,
+		Timeout:    2500 * time.Millisecond,
 		Nameserver: "1.1.1.1:53",
+		PrivateKey: privateKey,
 	}
 
 	http.HandleFunc("/dns-query/proxy", server.ProxyHandler)
