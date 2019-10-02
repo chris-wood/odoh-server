@@ -4,5 +4,8 @@ test:
 logs:
 	gcloud app logs tail -s default
 
-deploy:
-	gcloud app deploy --stop-previous-version app.yaml
+deploy-target:
+	gcloud app deploy --stop-previous-version target.yaml
+
+deploy-proxy:
+	gcloud app deploy --stop-previous-version proxy.yaml

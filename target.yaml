@@ -1,0 +1,5 @@
+# [START runtime]
+service: odoh-target
+runtime: go
+env: flex
+# [END runtime]

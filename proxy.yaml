@@ -1,4 +1,5 @@
 # [START runtime]
+service: odoh-proxy
 runtime: go
 env: flex
 # [END runtime]
