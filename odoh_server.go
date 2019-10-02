@@ -23,9 +23,9 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	timeout := 2500 * time.Millisecond
 	server := odoh.Server{
-		verbose:    true,
-		timeout:    timeout,
-		nameserver: "1.1.1.1:53",
+		Verbose:    true,
+		Timeout:    timeout,
+		Nameserver: "1.1.1.1:53",
 	}
 
 	http.HandleFunc("/dns-query/proxy", server.ProxyHandler)
