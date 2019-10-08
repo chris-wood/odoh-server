@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"bytes"
 	"fmt"
 	"github.com/bifurcation/hpke"
 	"github.com/chris-wood/odoh"
@@ -22,6 +23,8 @@ const (
 	nameServer = "1.1.1.1:53"
 
 	// HTTP constants
+	proxyURI = "https://odoh-proxy-dot-odoh-254517.appspot.com"
+	targetURI = "https://odoh-target-dot-odoh-254517.appspot.com"
 	proxyEndpoint  = "/dns-query/proxy"
 	targetEndpoint = "/dns-query"
 	healthEndpoint = "/health"
@@ -75,6 +78,7 @@ func main() {
 		Timeout:    2500 * time.Millisecond,
 		Nameserver: nameServer,
 		PrivateKey: privateKey,
+		DOHURI: fmt.Sprintf("%s/%s", targetURI, targetEndpoint),
 	}
 
 	endpoints := make(map[string]string)
