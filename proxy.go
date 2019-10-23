@@ -16,9 +16,16 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetName := r.URL.Query().Get("target")
+	targetName := r.URL.Query().Get("targethost")
 	if targetName == "" {
-		log.Println("Missing proxy target query parameter in POST request")
+		log.Println("Missing proxy targethost query parameter in POST request")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	targetPath := r.URL.Query().Get("targetpath")
+	if targetPath == "" {
+		log.Println("Missing proxy targetpath query parameter in POST request")
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -31,7 +38,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", targetName, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
 	if err != nil {
 		log.Println("Failed creating target POST request")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

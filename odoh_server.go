@@ -23,8 +23,7 @@ const (
 	// HTTP constants
 	proxyURI       = "https://odoh-proxy-dot-odoh-254517.appspot.com"
 	targetURI      = "https://odoh-target-dot-odoh-254517.appspot.com"
-	proxyEndpoint  = "/dns-query/proxy"
-	targetEndpoint = "/dns-query"
+	queryEndpoint = "/dns-query"
 	healthEndpoint = "/health"
 
 	// WebPvD configuration
@@ -42,8 +41,8 @@ func (s odohServer) indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 	fmt.Fprint(w, "ODOH service")
 	fmt.Fprint(w, "----------------")
-	fmt.Fprintf(w, "Proxy endpoint: https://%s:%s/%s\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[proxyEndpoint])
-	fmt.Fprintf(w, "Target endpoint: https://%s:%s/%s\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[targetEndpoint])
+	fmt.Fprintf(w, "Proxy endpoint: https://%s:%s/%s{?targethost,targetpath}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[queryEndpoint])
+	fmt.Fprintf(w, "Target endpoint: https://%s:%s/%s{?dns}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[queryEndpoint])
 	fmt.Fprint(w, "----------------")
 }
 
@@ -59,8 +58,7 @@ func main() {
 	}
 
 	endpoints := make(map[string]string)
-	endpoints["Proxy"] = proxyEndpoint
-	endpoints["Target"] = targetEndpoint
+	endpoints["Target"] = queryEndpoint
 	endpoints["Health"] = healthEndpoint
 
 	target := &targetServer{
@@ -75,11 +73,10 @@ func main() {
 	server := odohServer{
 		endpoints: endpoints,
 		target:    target,
-		DOHURI:    fmt.Sprintf("%s/%s", targetURI, targetEndpoint),
+		DOHURI:    fmt.Sprintf("%s/%s", targetURI, queryEndpoint),
 	}
 
-	http.HandleFunc(proxyEndpoint, proxyHandler)
-	http.HandleFunc(targetEndpoint, target.queryHandler)
+	http.HandleFunc(queryEndpoint, target.queryHandler)
 	http.HandleFunc(healthEndpoint, server.healthCheckHandler)
 	http.HandleFunc("/", server.indexHandler)
 

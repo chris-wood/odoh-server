@@ -195,7 +195,10 @@ func (s *targetServer) serverWebPvD(w http.ResponseWriter, r *http.Request) {
 func (s *targetServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
-	if r.Header.Get("Content-Type") == "application/dns-message" {
+	targetName := r.URL.Query().Get("targethost")
+	if targetName != "" {
+		proxyHandler(w, r)
+	} else if r.Header.Get("Content-Type") == "application/dns-message" {
 		s.plainQueryHandler(w, r)
 	} else if r.Header.Get("Content-Type") == "application/oblivious-dns-message" {
 		s.obliviousQueryHandler(w, r)
