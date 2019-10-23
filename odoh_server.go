@@ -39,11 +39,11 @@ type odohServer struct {
 
 func (s odohServer) indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
-	fmt.Fprint(w, "ODOH service")
-	fmt.Fprint(w, "----------------")
+	fmt.Fprint(w, "ODOH service\n")
+	fmt.Fprint(w, "----------------\n")
 	fmt.Fprintf(w, "Proxy endpoint: https://%s:%s/%s{?targethost,targetpath}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[queryEndpoint])
 	fmt.Fprintf(w, "Target endpoint: https://%s:%s/%s{?dns}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[queryEndpoint])
-	fmt.Fprint(w, "----------------")
+	fmt.Fprint(w, "----------------\n")
 }
 
 func (s odohServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
