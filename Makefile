@@ -4,7 +4,7 @@ test:
 logs-target:
 	gcloud app logs tail -s odoh-target
 
-lggs-proxy:
+logs-proxy:
 	gcloud app logs tail -s odoh-proxy
 
 deploy-target:
