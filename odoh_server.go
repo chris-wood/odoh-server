@@ -41,10 +41,11 @@ const (
 	nameServer = "1.1.1.1:53"
 
 	// HTTP constants. Fill in your proxy and target here.
-	proxyURI       = "https://dnstarget.example.net"
-	targetURI      = "https://dnsproxy.example.net"
-	queryEndpoint = "/dns-query"
-	healthEndpoint = "/health"
+	proxyURI          = "https://dnstarget.example.net"
+	targetURI         = "https://dnsproxy.example.net"
+	queryEndpoint     = "/dns-query"
+	healthEndpoint    = "/health"
+	publicKeyEndpoint = "/pk"
 
 	// WebPvD configuration. Fill in your values here.
 	webPvDString = `"{ "identifier" : "github.com", "expires" : "2019-08-23T06:00:00Z", "prefixes" : [ ], "dnsZones" : [ "odoh.example.net" ] }"`
@@ -80,6 +81,7 @@ func main() {
 	endpoints := make(map[string]string)
 	endpoints["Target"] = queryEndpoint
 	endpoints["Health"] = healthEndpoint
+	endpoints["PublicKey"] = publicKeyEndpoint
 
 	target := &targetServer{
 		verbose: true,
@@ -98,6 +100,7 @@ func main() {
 
 	http.HandleFunc(queryEndpoint, target.queryHandler)
 	http.HandleFunc(healthEndpoint, server.healthCheckHandler)
+	http.HandleFunc(publicKeyEndpoint, target.publicKeyEndpointHandler)
 	http.HandleFunc("/", server.indexHandler)
 
 	log.Print("Listening on port 8080")

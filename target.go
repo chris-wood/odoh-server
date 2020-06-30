@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"github.com/chris-wood/dns"
 	"github.com/chris-wood/odoh"
+	"github.com/kelindar/binary"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -230,4 +231,14 @@ func (s *targetServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Invalid content type: %s", r.Header.Get("Content-Type"))
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
+}
+
+func (s *targetServer) publicKeyEndpointHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
+	pkBytes, err := binary.Marshal(s.privateKey.PublicKey)
+	if err != nil {
+		log.Fatalln("Unable to Marshal Public Key Data Correctly", err)
+	}
+
+	w.Write(pkBytes)
 }
