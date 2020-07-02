@@ -35,9 +35,9 @@ import (
 )
 
 type targetServer struct {
-	verbose    bool
-	resolver   *targetResolver
-	privateKey odoh.ObliviousDNSPrivateKey
+	verbose     bool
+	resolver    *targetResolver
+	odohKeyPair odoh.ObliviousDNSKeyPair
 }
 
 func decodeDNSQuestion(encodedMessage []byte) (*dns.Msg, error) {
@@ -143,7 +143,7 @@ func (s *targetServer) parseObliviousQueryFromRequest(r *http.Request) (*odoh.Ob
 		return nil, err
 	}
 
-	obliviousQuery, err := s.privateKey.DecryptQuery(*obliviousMessage)
+	obliviousQuery, err := s.odohKeyPair.DecryptQuery(*obliviousMessage)
 	if err != nil {
 		log.Println("Failed decrypting oblivious query body:", err)
 		return nil, err
@@ -153,14 +153,14 @@ func (s *targetServer) parseObliviousQueryFromRequest(r *http.Request) (*odoh.Ob
 }
 
 func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQuery, response []byte) (*odoh.ObliviousDNSMessage, error) {
-	suite, err := s.privateKey.CipherSuite()
+	suite, err := s.odohKeyPair.CipherSuite()
 	if err != nil {
 		log.Println("Failed building HPKE ciphersuite:", err)
 		return nil, err
 	}
 
 	responseKeyId := []byte{0x00, 0x00}
-	aad := append([]byte{0x02}, responseKeyId...) // message_type = 0x02, with an empty keyID
+	aad := append([]byte{byte(odoh.ResponseType)}, responseKeyId...) // message_type = 0x02, with an empty keyID
 	encryptedResponse, err := query.EncryptResponse(suite, aad, response)
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQ
 		log.Printf("Encrypted response: %x", encryptedResponse)
 	}
 
-	return odoh.CreateObliviousDNSMessage(0x02, []byte{}, encryptedResponse), nil
+	return odoh.CreateObliviousDNSMessage(odoh.ResponseType, []byte{}, encryptedResponse), nil
 }
 
 func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +235,7 @@ func (s *targetServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *targetServer) publicKeyEndpointHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
-	pkBytes, err := binary.Marshal(s.privateKey.PublicKey)
+	pkBytes, err := binary.Marshal(s.odohKeyPair.PublicKey)
 	if err != nil {
 		log.Fatalln("Unable to Marshal Public Key Data Correctly", err)
 	}

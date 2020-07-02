@@ -73,7 +73,7 @@ func (s odohServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	privateKey, err := odoh.CreatePrivateKey(kemID, kdfID, aeadID)
+	privateKey, err := odoh.CreateKeyPair(kemID, kdfID, aeadID)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
 	}
@@ -89,7 +89,7 @@ func main() {
 			timeout:    2500 * time.Millisecond,
 			nameserver: nameServer,
 		},
-		privateKey: privateKey,
+		odohKeyPair: privateKey,
 	}
 
 	server := odohServer{
