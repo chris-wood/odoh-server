@@ -24,7 +24,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -54,14 +53,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close()
-	b64body, err := ioutil.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Println("Missing proxy message body in POST request")
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-
-	body, err := base64.RawURLEncoding.DecodeString(string(b64body))
 
 	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
 	if err != nil {
