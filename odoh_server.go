@@ -44,6 +44,7 @@ const (
 	proxyURI          = "https://dnstarget.example.net"
 	targetURI         = "https://dnsproxy.example.net"
 	queryEndpoint     = "/dns-query"
+	proxyEndpoint     = "/proxy"
 	healthEndpoint    = "/health"
 	publicKeyEndpoint = "/pk"
 
@@ -62,7 +63,7 @@ func (s odohServer) indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 	fmt.Fprint(w, "ODOH service\n")
 	fmt.Fprint(w, "----------------\n")
-	fmt.Fprintf(w, "Proxy endpoint: https://%s:%s/%s{?targethost,targetpath}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[queryEndpoint])
+	fmt.Fprintf(w, "Proxy endpoint: https://%s:%s/%s{?targethost,targetpath}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[proxyEndpoint])
 	fmt.Fprintf(w, "Target endpoint: https://%s:%s/%s{?dns}\n", r.URL.Hostname(), r.URL.Port(), s.endpoints[queryEndpoint])
 	fmt.Fprint(w, "----------------\n")
 }
@@ -80,6 +81,7 @@ func main() {
 
 	endpoints := make(map[string]string)
 	endpoints["Target"] = queryEndpoint
+	endpoints["Proxy"] = proxyEndpoint
 	endpoints["Health"] = healthEndpoint
 	endpoints["PublicKey"] = publicKeyEndpoint
 
@@ -99,6 +101,7 @@ func main() {
 	}
 
 	http.HandleFunc(queryEndpoint, target.queryHandler)
+	http.HandleFunc(proxyEndpoint, proxyHandler)
 	http.HandleFunc(healthEndpoint, server.healthCheckHandler)
 	http.HandleFunc(publicKeyEndpoint, target.publicKeyEndpointHandler)
 	http.HandleFunc("/", server.indexHandler)
