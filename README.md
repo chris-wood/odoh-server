@@ -7,7 +7,10 @@
 To deploy, run:
 
 ~~~
-$ gcloud app deploy app.yaml
+$ gcloud app deploy proxy.yaml
+...
+$ gcloud app deploy target.yaml
+...
 ~~~
 
 To check on its status, run:
