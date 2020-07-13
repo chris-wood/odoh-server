@@ -24,7 +24,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/chris-wood/dns"
+	"github.com/miekg/dns"
 	"net"
 	"time"
 )
