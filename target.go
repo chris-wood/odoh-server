@@ -25,7 +25,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/chris-wood/dns"
+	"github.com/miekg/dns"
 	"github.com/chris-wood/odoh"
 	"github.com/kelindar/binary"
 	"io/ioutil"

@@ -6,6 +6,12 @@ github.com/chris-wood/dns v0.0.0-20161202223856-f4d2b086946a h1:RWhxDAyhj+kbINmE
 github.com/chris-wood/dns v0.0.0-20161202223856-f4d2b086946a/go.mod h1:Bue0czgDF3Wc5xx7zFZhHQd5ipC2w8YJut6H86QNRBc=
 github.com/chris-wood/odoh v0.0.0-20200702224035-7c190c28ea19 h1:wVxW4hE7DjLM88QFpf5gip8fvzZ5mHk7x9mpQ0qQV+8=
 github.com/chris-wood/odoh v0.0.0-20200702224035-7c190c28ea19/go.mod h1:LQEuPcyicHARZq2zs70eoqcfTg/k9MZKMre3dzF58lQ=
+github.com/chris-wood/odoh v0.0.0-20200713160342-5a2f10ce8b36 h1:cpPDk+upGeD6oafcspnJh/8Cl4+AkOP+ShOl5M3Aq+w=
+github.com/chris-wood/odoh v0.0.0-20200713160342-5a2f10ce8b36/go.mod h1:uj93pPykgQ+WC/h9KQDNW6o76g2l28stR+UNQEOj1Uc=
+github.com/cisco/go-hpke v0.0.0-20200603153819-0a6c8374cd9a h1:avwcoMq3mm7ACKdjsMooUWHPFuVrTc8Q47ZDSGP6GOo=
+github.com/cisco/go-hpke v0.0.0-20200603153819-0a6c8374cd9a/go.mod h1:7ykSQZaBVJLIRoJ7OMiJgpdOD74cTHdXRo6XPMIfu20=
+github.com/cisco/go-hpke v0.0.0-20200710171132-37d332d5f613 h1:u9M24d+jQHVN+NfFmEaprJgqPIgJCYvBenR1T216ep0=
+github.com/cisco/go-hpke v0.0.0-20200710171132-37d332d5f613/go.mod h1:7ykSQZaBVJLIRoJ7OMiJgpdOD74cTHdXRo6XPMIfu20=
 github.com/cisco/go-tls-syntax v0.0.0-20200617162716-46b0cfb76b9b h1:Ves2turKTX7zruivAcUOQg155xggcbv3suVdbKCBQNM=
 github.com/cisco/go-tls-syntax v0.0.0-20200617162716-46b0cfb76b9b/go.mod h1:0AZAV7lYvynZQ5ErHlGMKH+4QYMyNCFd+AiL9MlrCYA=
 github.com/cloudflare/circl v1.0.0 h1:64b6pyfCFbYm623ncIkYGNZaOcmIbyd+CjyMi2L9vdI=
@@ -18,6 +24,8 @@ github.com/kelindar/binary v1.0.9 h1:Rngq8Kd8BTdqJlmH6fvIlgKypMLcJGykynsyigjbMG8
 github.com/kelindar/binary v1.0.9/go.mod h1:4zDwr5pQvY3i4xrRd1kC7pcuWvSU/Jbh/v2D0tZUPfE=
 github.com/miekg/dns v1.1.29 h1:xHBEhR+t5RzcFJjBLJlax2daXOrTYtr9z4WdKEfWFzg=
 github.com/miekg/dns v1.1.29/go.mod h1:KNUDUusw/aVsxyTYZM1oqvCicbwhgbNgztCETuNZ7xM=
+github.com/miekg/dns v1.1.30 h1:Qww6FseFn8PRfw07jueqIXqodm0JKiiKuK0DeXSqfyo=
+github.com/miekg/dns v1.1.30/go.mod h1:KNUDUusw/aVsxyTYZM1oqvCicbwhgbNgztCETuNZ7xM=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
