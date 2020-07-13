@@ -24,7 +24,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/bifurcation/hpke"
+	"github.com/cisco/go-hpke"
 	"github.com/chris-wood/odoh"
 	"log"
 	"net/http"
