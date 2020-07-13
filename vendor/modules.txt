@@ -1,0 +1,43 @@
+# git.schwanenlied.me/yawning/x448.git v0.0.0-20170617130356-01b048fb03d6
+git.schwanenlied.me/yawning/x448.git
+# github.com/chris-wood/odoh v0.0.0-20200713160342-5a2f10ce8b36
+## explicit
+github.com/chris-wood/odoh
+# github.com/cisco/go-hpke v0.0.0-20200710171132-37d332d5f613
+## explicit
+github.com/cisco/go-hpke
+# github.com/cisco/go-tls-syntax v0.0.0-20200617162716-46b0cfb76b9b
+github.com/cisco/go-tls-syntax
+# github.com/cloudflare/circl v1.0.0
+github.com/cloudflare/circl/dh/sidh
+github.com/cloudflare/circl/dh/sidh/internal/common
+github.com/cloudflare/circl/dh/sidh/internal/p503
+github.com/cloudflare/circl/dh/sidh/internal/p751
+github.com/cloudflare/circl/dh/sidh/internal/shake
+# github.com/kelindar/binary v1.0.9
+## explicit
+github.com/kelindar/binary
+# github.com/miekg/dns v1.1.30
+## explicit
+github.com/miekg/dns
+# golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+## explicit
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/chacha20poly1305
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/ed25519
+golang.org/x/crypto/ed25519/internal/edwards25519
+golang.org/x/crypto/internal/subtle
+golang.org/x/crypto/poly1305
+# golang.org/x/net v0.0.0-20190923162816-aa69164e4478
+golang.org/x/net/bpf
+golang.org/x/net/internal/iana
+golang.org/x/net/internal/socket
+golang.org/x/net/ipv4
+golang.org/x/net/ipv6
+# golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae
+## explicit
+golang.org/x/sys/cpu
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
