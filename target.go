@@ -25,9 +25,8 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/miekg/dns"
 	"github.com/chris-wood/odoh"
-	"github.com/kelindar/binary"
+	"github.com/miekg/dns"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -235,10 +234,7 @@ func (s *targetServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *targetServer) publicKeyEndpointHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
-	pkBytes, err := binary.Marshal(s.odohKeyPair.PublicKey)
-	if err != nil {
-		log.Fatalln("Unable to Marshal Public Key Data Correctly", err)
-	}
+	pkBytes := s.odohKeyPair.PublicKey.Marshal()
 
 	w.Write(pkBytes)
 }
