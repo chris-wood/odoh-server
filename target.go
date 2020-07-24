@@ -219,7 +219,9 @@ func (s *targetServer) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	targetName := r.URL.Query().Get("targethost")
 	if targetName != "" {
-		proxyHandler(w, r)
+		log.Printf("Proxy request made via dns-query request interface. Use /proxy instead")
+		http.Error(w, http.StatusText(http.StatusUseProxy), http.StatusUseProxy)
+		// Clients should use the /proxy route instead of the query route.
 	} else if r.Header.Get("Content-Type") == "application/dns-message" {
 		s.plainQueryHandler(w, r)
 	} else if r.Header.Get("Content-Type") == "application/oblivious-dns-message" {

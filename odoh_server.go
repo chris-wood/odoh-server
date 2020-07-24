@@ -24,8 +24,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/cisco/go-hpke"
 	"github.com/chris-wood/odoh"
+	"github.com/cisco/go-hpke"
 	"log"
 	"net/http"
 	"time"
@@ -94,6 +94,15 @@ func main() {
 		odohKeyPair: privateKey,
 	}
 
+	proxy := &proxyServer{
+		client: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 0 * time.Second,
+			},
+		},
+	}
+
 	server := odohServer{
 		endpoints: endpoints,
 		target:    target,
@@ -101,7 +110,7 @@ func main() {
 	}
 
 	http.HandleFunc(queryEndpoint, target.queryHandler)
-	http.HandleFunc(proxyEndpoint, proxyHandler)
+	http.HandleFunc(proxyEndpoint, proxy.proxyHandler)
 	http.HandleFunc(healthEndpoint, server.healthCheckHandler)
 	http.HandleFunc(publicKeyEndpoint, target.publicKeyEndpointHandler)
 	http.HandleFunc("/", server.indexHandler)
