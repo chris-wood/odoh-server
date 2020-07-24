@@ -28,6 +28,7 @@ import (
 	"github.com/chris-wood/odoh"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -74,6 +75,13 @@ func (s odohServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	f, err := os.OpenFile("server_log.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Unable to create a log file to log data into.")
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	privateKey, err := odoh.CreateKeyPair(kemID, kdfID, aeadID)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")

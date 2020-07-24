@@ -1,4 +1,4 @@
 # [START runtime]
 service: odoh-target
-runtime: go112
+runtime: go114
 # [END runtime]

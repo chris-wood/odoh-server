@@ -24,10 +24,33 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net/http"
 )
+
+func forwardProxyRequest(targetName string, targetPath string, body []byte, headerContentType string) ([]byte, error) {
+	proxyClientInstance := GetProxyStateInstance()
+
+	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
+	if err != nil {
+		log.Println("Failed creating target POST request")
+		return nil, errors.New("failed creating target POST request")
+	}
+	req.Header.Set("Content-Type", headerContentType)
+
+	client := proxyClientInstance.client
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Failed to send proxied message")
+		return nil, errors.New("failed to send proxied message")
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := ioutil.ReadAll(resp.Body)
+	return responseBody, err
+}
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
@@ -60,23 +83,13 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
+	headerContentType := r.Header.Get("Content-Type")
+
+	responseBody, err := forwardProxyRequest(targetName, targetPath, body, headerContentType)
 	if err != nil {
-		log.Println("Failed creating target POST request")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	req.Header.Set("Content-Type", r.Header.Get("Content-Type"))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Println("Failed to send proxied message")
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	}
-	defer resp.Body.Close()
-
-	responseBody, err := ioutil.ReadAll(resp.Body)
 	w.Header().Set("Content-Type", "application/oblivious-dns-message")
 	w.Write(responseBody)
 }
