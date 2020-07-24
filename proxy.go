@@ -30,9 +30,11 @@ import (
 	"net/http"
 )
 
-func forwardProxyRequest(targetName string, targetPath string, body []byte, headerContentType string) ([]byte, error) {
-	proxyClientInstance := GetProxyStateInstance()
+type proxyServer struct {
+	client *http.Client
+}
 
+func forwardProxyRequest(clientInstance *http.Client, targetName string, targetPath string, body []byte, headerContentType string) ([]byte, error) {
 	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
 	if err != nil {
 		log.Println("Failed creating target POST request")
@@ -40,7 +42,7 @@ func forwardProxyRequest(targetName string, targetPath string, body []byte, head
 	}
 	req.Header.Set("Content-Type", headerContentType)
 
-	client := proxyClientInstance.client
+	client := clientInstance
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("Failed to send proxied message")
@@ -52,7 +54,7 @@ func forwardProxyRequest(targetName string, targetPath string, body []byte, head
 	return responseBody, err
 }
 
-func proxyHandler(w http.ResponseWriter, r *http.Request) {
+func (p *proxyServer) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
 	if r.Method != "POST" {
@@ -85,7 +87,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	headerContentType := r.Header.Get("Content-Type")
 
-	responseBody, err := forwardProxyRequest(targetName, targetPath, body, headerContentType)
+	responseBody, err := forwardProxyRequest(p.client, targetName, targetPath, body, headerContentType)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
