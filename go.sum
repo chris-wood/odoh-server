@@ -1,7 +1,7 @@
 git.schwanenlied.me/yawning/x448.git v0.0.0-20170617130356-01b048fb03d6 h1:w8IZgCntCe0RuBJp+dENSMwEBl/k8saTgJ5hPca5IWw=
 git.schwanenlied.me/yawning/x448.git v0.0.0-20170617130356-01b048fb03d6/go.mod h1:wQaGCqEu44ykB17jZHCevrgSVl3KJnwQBObUtrKU4uU=
-github.com/chris-wood/odoh v0.0.0-20200713191747-dca7f5ffc0b3 h1:Hobxm0xGev00Kbh/Xdjaga3RKjdREqHisd4t77uCjtA=
-github.com/chris-wood/odoh v0.0.0-20200713191747-dca7f5ffc0b3/go.mod h1:uj93pPykgQ+WC/h9KQDNW6o76g2l28stR+UNQEOj1Uc=
+github.com/chris-wood/odoh v0.0.0-20200724231530-0ed46d9d2387 h1:4SJlVAvEgzXBDBckpBQCyqNyyA/ixqSsoTopkJGLov8=
+github.com/chris-wood/odoh v0.0.0-20200724231530-0ed46d9d2387/go.mod h1:uj93pPykgQ+WC/h9KQDNW6o76g2l28stR+UNQEOj1Uc=
 github.com/cisco/go-hpke v0.0.0-20200710171132-37d332d5f613 h1:u9M24d+jQHVN+NfFmEaprJgqPIgJCYvBenR1T216ep0=
 github.com/cisco/go-hpke v0.0.0-20200710171132-37d332d5f613/go.mod h1:7ykSQZaBVJLIRoJ7OMiJgpdOD74cTHdXRo6XPMIfu20=
 github.com/cisco/go-tls-syntax v0.0.0-20200617162716-46b0cfb76b9b h1:Ves2turKTX7zruivAcUOQg155xggcbv3suVdbKCBQNM=
