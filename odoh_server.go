@@ -23,11 +23,14 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"github.com/chris-wood/odoh"
 	"github.com/cisco/go-hpke"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -74,7 +77,21 @@ func (s odohServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	privateKey, err := odoh.CreateKeyPair(kemID, kdfID, aeadID)
+	var seed []byte
+	if seedHex := os.Getenv("SEED_SECRET_KEY"); seedHex != "" {
+		log.Printf("Using Secret Key Seed : [%v]", seedHex)
+		var err error
+		seed, err = hex.DecodeString(seedHex)
+		if err != nil {
+			log.Printf("Unable to decode hex string to byte array. %v", err)
+		}
+	} else {
+		seed = make([]byte, 16)
+		rand.Read(seed)
+		log.Printf("Generating a random seed for KeyPair")
+	}
+
+	privateKey, err := odoh.DeriveFixedKeyPairFromSeed(kemID, kdfID, aeadID, seed)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
 	}

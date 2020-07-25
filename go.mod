@@ -3,7 +3,7 @@ module github.com/chris-wood/odoh-server
 go 1.14
 
 require (
-	github.com/chris-wood/odoh v0.0.0-20200713191747-dca7f5ffc0b3
+	github.com/chris-wood/odoh v0.0.0-20200724231530-0ed46d9d2387
 	github.com/cisco/go-hpke v0.0.0-20200710171132-37d332d5f613
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/miekg/dns v1.1.30

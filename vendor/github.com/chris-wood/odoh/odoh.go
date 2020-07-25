@@ -143,6 +143,27 @@ func (k ObliviousDNSKeyPair) CipherSuite() (hpke.CipherSuite, error) {
 	return hpke.AssembleCipherSuite(k.PublicKey.KemID, k.PublicKey.KdfID, k.PublicKey.AeadID)
 }
 
+func DeriveFixedKeyPairFromSeed(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID, ikm []byte) (ObliviousDNSKeyPair, error) {
+	suite, err := hpke.AssembleCipherSuite(kemID, kdfID, aeadID)
+	if err != nil {
+		return ObliviousDNSKeyPair{}, err
+	}
+
+	sk, pk, err := suite.KEM.DeriveKeyPair(ikm)
+	if err != nil {
+		return ObliviousDNSKeyPair{}, err
+	}
+
+	publicKey := ObliviousDNSPublicKey{
+		KemID:          kemID,
+		KdfID:          kdfID,
+		AeadID:         aeadID,
+		PublicKeyBytes: suite.KEM.Serialize(pk),
+	}
+
+	return ObliviousDNSKeyPair{publicKey, sk}, nil
+}
+
 func CreateKeyPair(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID) (ObliviousDNSKeyPair, error) {
 	suite, err := hpke.AssembleCipherSuite(kemID, kdfID, aeadID)
 	if err != nil {
