@@ -16,6 +16,12 @@ github.com/cloudflare/circl/dh/sidh/internal/p751
 github.com/cloudflare/circl/dh/sidh/internal/shake
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
+# github.com/elastic/go-elasticsearch/v8 v8.0.0-20200716073932-4f0b75746dc1
+## explicit
+github.com/elastic/go-elasticsearch/v8
+github.com/elastic/go-elasticsearch/v8/esapi
+github.com/elastic/go-elasticsearch/v8/estransport
+github.com/elastic/go-elasticsearch/v8/internal/version
 # github.com/miekg/dns v1.1.30
 ## explicit
 github.com/miekg/dns

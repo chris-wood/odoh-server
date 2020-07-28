@@ -34,6 +34,10 @@ type targetResolver struct {
 	timeout    time.Duration
 }
 
+func (s targetResolver) getResolverServerName() string {
+	return s.nameserver
+}
+
 func (s targetResolver) resolve(query *dns.Msg) (*dns.Msg, error) {
 	connection := new(dns.Conn)
 	var err error
