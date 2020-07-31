@@ -34,11 +34,12 @@ import (
 )
 
 type targetServer struct {
-	verbose     bool
-	resolver    []*targetResolver
-	odohKeyPair odoh.ObliviousDNSKeyPair
-	telemetryClient *telemetry
+	verbose            bool
+	resolver           []*targetResolver
+	odohKeyPair        odoh.ObliviousDNSKeyPair
+	telemetryClient    *telemetry
 	serverInstanceName string
+	experimentId       string
 }
 
 func decodeDNSQuestion(encodedMessage []byte) (*dns.Msg, error) {
@@ -207,7 +208,9 @@ func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQ
 func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Request) {
 	requestReceivedTime := time.Now()
 	exp := experiment{}
+	exp.ExperimentID = s.experimentId
 	exp.IngestedFrom = s.serverInstanceName
+	exp.ProtocolType = "ODOH"
 	timestamp := runningTime{}
 
 	timestamp.Start = requestReceivedTime.UnixNano()
