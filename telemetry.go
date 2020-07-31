@@ -12,10 +12,10 @@ import (
 	"sync"
 )
 
-// This RunningTime structure contains the epoch timestamps for the following operations
+// This runningTime structure contains the epoch timestamps for the following operations
 // 1. Start => Epoch time at which the request is received by the ObliviousDNSHandler
 // 2. TargetQueryDecryptionTime => Epoch
-type RunningTime struct {
+type runningTime struct {
 	Start int64
 	TargetQueryDecryptionTime int64
 	TargetQueryResolutionTime int64
@@ -23,15 +23,15 @@ type RunningTime struct {
 	EndTime int64
 }
 
-type Experiment struct {
-	RequestID []byte
-	Resolver  string
-	Timestamp RunningTime
-	Status bool
+type experiment struct {
+	RequestID    []byte
+	Resolver     string
+	Timestamp    runningTime
+	Status       bool
 	IngestedFrom string
 }
 
-func (e *Experiment) serialize() string {
+func (e *experiment) serialize() string {
 	exp := &e
 	response, err := json.Marshal(exp)
 	if err != nil {
@@ -81,13 +81,11 @@ func getTelemetryInstance() *telemetry {
 }
 
 func (t *telemetry) streamTelemetryToGCPLogging(dataItems []string) {
-	//var wg sync.WaitGroup
 	defer t.cloudlogger.Flush()
 	for _, item := range dataItems {
 		log.Printf("Logging %v to the GCP instance\n", item)
 		t.cloudlogger.Log(logging.Entry{Payload: item})
 	}
-	//wg.Wait()
 }
 
 func (t *telemetry) streamDataToElastic(dataItems []string) {

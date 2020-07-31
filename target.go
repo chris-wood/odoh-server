@@ -106,7 +106,7 @@ func (s *targetServer) resolveQuery(query *dns.Msg) ([]byte, error) {
 	return packedResponse, err
 }
 
-func (s *targetServer) resolveQueryUsingNS(query *dns.Msg, resolver *targetResolver) ([]byte, error) {
+func (s *targetServer) resolveQueryWithResolver(query *dns.Msg, resolver *targetResolver) ([]byte, error) {
 	packedQuery, err := query.Pack()
 	if err != nil {
 		log.Println("Failed encoding DNS query:", err)
@@ -206,9 +206,9 @@ func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQ
 
 func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Request) {
 	requestReceivedTime := time.Now()
-	exp := Experiment{}
+	exp := experiment{}
 	exp.IngestedFrom = s.serverInstanceName
-	timestamp := RunningTime{}
+	timestamp := runningTime{}
 
 	timestamp.Start = requestReceivedTime.UnixNano()
 	obliviousQuery, err := s.parseObliviousQueryFromRequest(r)
@@ -230,7 +230,7 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 	timestamp.TargetQueryDecryptionTime = queryParseAndDecryptionCompleteTime
 
 	resolverChosen := s.resolver[chosenResolver]
-	packedResponse, err := s.resolveQueryUsingNS(query, resolverChosen)
+	packedResponse, err := s.resolveQueryWithResolver(query, resolverChosen)
 	if err != nil {
 		log.Println("Failed resolving DNS query:", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
