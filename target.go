@@ -35,8 +35,10 @@ import (
 
 type targetServer struct {
 	verbose     bool
-	resolver    *targetResolver
+	resolver    []*targetResolver
 	odohKeyPair odoh.ObliviousDNSKeyPair
+	telemetryClient *telemetry
+	serverInstanceName string
 }
 
 func decodeDNSQuestion(encodedMessage []byte) (*dns.Msg, error) {
@@ -88,7 +90,37 @@ func (s *targetServer) resolveQuery(query *dns.Msg) ([]byte, error) {
 	}
 
 	start := time.Now()
-	response, err := s.resolver.resolve(query)
+	response, err := s.resolver[0].resolve(query)
+	elapsed := time.Now().Sub(start)
+
+	packedResponse, err := response.Pack()
+	if err != nil {
+		log.Println("Failed encoding DNS response:", err)
+		return nil, err
+	}
+
+	if s.verbose {
+		log.Printf("Answer=%s elapsed=%s\n", packedResponse, elapsed.String())
+	}
+
+	return packedResponse, err
+}
+
+func (s *targetServer) resolveQueryUsingNS(query *dns.Msg, resolver *targetResolver) ([]byte, error) {
+	packedQuery, err := query.Pack()
+	if err != nil {
+		log.Println("Failed encoding DNS query:", err)
+		return nil, err
+	}
+
+	if s.verbose {
+		log.Printf("Query=%s\n", packedQuery)
+	}
+
+	log.Printf("Resolving query using %v", resolver.getResolverServerName())
+
+	start := time.Now()
+	response, err := resolver.resolve(query)
 	elapsed := time.Now().Sub(start)
 
 	packedResponse, err := response.Pack()
@@ -173,11 +205,19 @@ func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQ
 }
 
 func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Request) {
+	requestReceivedTime := time.Now()
+	exp := Experiment{}
+	exp.IngestedFrom = s.serverInstanceName
+	timestamp := RunningTime{}
+
+	timestamp.Start = requestReceivedTime.UnixNano()
 	obliviousQuery, err := s.parseObliviousQueryFromRequest(r)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	exp.RequestID = obliviousQuery.ResponseKey
+	chosenResolver := int(obliviousQuery.ResponseKey[len(obliviousQuery.ResponseKey) - 1]) % len(nameServers)
 
 	query, err := decodeDNSQuestion(obliviousQuery.Message())
 	if err != nil {
@@ -186,24 +226,50 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	packedResponse, err := s.resolveQuery(query)
+	queryParseAndDecryptionCompleteTime := time.Now().UnixNano()
+	timestamp.TargetQueryDecryptionTime = queryParseAndDecryptionCompleteTime
+
+	resolverChosen := s.resolver[chosenResolver]
+	packedResponse, err := s.resolveQueryUsingNS(query, resolverChosen)
 	if err != nil {
 		log.Println("Failed resolving DNS query:", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
+	queryResolutionCompleteTime := time.Now().UnixNano()
+	timestamp.TargetQueryResolutionTime = queryResolutionCompleteTime
+
 	obliviousResponse, err := s.createObliviousResponseForQuery(obliviousQuery, packedResponse)
 	if err != nil {
 		log.Println("Failed creating DNS oblivious DNS response:", err)
+		timestamp.TargetAnswerEncryptionTime = 0
+		timestamp.EndTime = 0
+		exp.Timestamp = timestamp
+		exp.Status = false
+		exp.Resolver = ""
+		go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	packedResponseMessage := obliviousResponse.Marshal()
 
+	answerEncryptionAndSerializeCompletionTime := time.Now().UnixNano()
+	timestamp.TargetAnswerEncryptionTime = answerEncryptionAndSerializeCompletionTime
+
 	if s.verbose {
 		log.Printf("Target response: %x", packedResponseMessage)
 	}
+
+	returnResponseTime := time.Now().UnixNano()
+	timestamp.EndTime = returnResponseTime
+
+	exp.Timestamp = timestamp
+	exp.Resolver = s.resolver[chosenResolver].getResolverServerName()
+	exp.Status = true
+
+	//go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+	go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
 
 	w.Header().Set("Content-Type", "application/oblivious-dns-message")
 	w.Write(packedResponseMessage)

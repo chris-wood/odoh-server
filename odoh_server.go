@@ -40,9 +40,6 @@ const (
 	kdfID  = hpke.KDF_HKDF_SHA256
 	aeadID = hpke.AEAD_AESGCM128
 
-	// DNS constants. Fill in a DNS server to forward to here.
-	nameServer = "1.1.1.1:53"
-
 	// HTTP constants. Fill in your proxy and target here.
 	proxyURI          = "https://dnstarget.example.net"
 	targetURI         = "https://dnsproxy.example.net"
@@ -53,6 +50,11 @@ const (
 
 	// WebPvD configuration. Fill in your values here.
 	webPvDString = `"{ "identifier" : "github.com", "expires" : "2019-08-23T06:00:00Z", "prefixes" : [ ], "dnsZones" : [ "odoh.example.net" ] }"`
+)
+
+var (
+	// DNS constants. Fill in a DNS server to forward to here.
+	nameServers = []string{"1.1.1.1:53", "8.8.8.8:53", "9.9.9.9:53"}
 )
 
 type odohServer struct {
@@ -91,6 +93,14 @@ func main() {
 		log.Printf("Generating a random seed for KeyPair")
 	}
 
+	var serverName string
+	if serverNameSetting := os.Getenv("TARGET_INSTANCE_NAME"); serverNameSetting != "" {
+		serverName = serverNameSetting
+	} else {
+		serverName = "server_target_localhost"
+	}
+	log.Printf("Setting Server Name as %v", serverName)
+
 	privateKey, err := odoh.DeriveFixedKeyPairFromSeed(kemID, kdfID, aeadID, seed)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
@@ -102,13 +112,22 @@ func main() {
 	endpoints["Health"] = healthEndpoint
 	endpoints["PublicKey"] = publicKeyEndpoint
 
+	resolversInUse := make([]*targetResolver, len(nameServers))
+
+	for index := 0; index < len(nameServers); index++ {
+		resolver := &targetResolver{
+			timeout: 2500 * time.Millisecond,
+			nameserver: nameServers[index],
+		}
+		resolversInUse[index] = resolver
+	}
+
 	target := &targetServer{
 		verbose: true,
-		resolver: &targetResolver{
-			timeout:    2500 * time.Millisecond,
-			nameserver: nameServer,
-		},
+		resolver: resolversInUse,
 		odohKeyPair: privateKey,
+		telemetryClient: getTelemetryInstance(),
+		serverInstanceName: serverName,
 	}
 
 	proxy := &proxyServer{
