@@ -93,6 +93,14 @@ func main() {
 		log.Printf("Generating a random seed for KeyPair")
 	}
 
+	var serverName string
+	if serverNameSetting := os.Getenv("TARGET_INSTANCE_NAME"); serverNameSetting != "" {
+		serverName = serverNameSetting
+	} else {
+		serverName = "server_target_localhost"
+	}
+	log.Printf("Setting Server Name as %v", serverName)
+
 	privateKey, err := odoh.DeriveFixedKeyPairFromSeed(kemID, kdfID, aeadID, seed)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
@@ -119,6 +127,7 @@ func main() {
 		resolver: resolversInUse,
 		odohKeyPair: privateKey,
 		telemetryClient: getTelemetryInstance(),
+		serverInstanceName: serverName,
 	}
 
 	proxy := &proxyServer{

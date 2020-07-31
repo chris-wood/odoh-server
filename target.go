@@ -38,6 +38,7 @@ type targetServer struct {
 	resolver    []*targetResolver
 	odohKeyPair odoh.ObliviousDNSKeyPair
 	telemetryClient *telemetry
+	serverInstanceName string
 }
 
 func decodeDNSQuestion(encodedMessage []byte) (*dns.Msg, error) {
@@ -206,7 +207,7 @@ func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQ
 func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Request) {
 	requestReceivedTime := time.Now()
 	exp := Experiment{}
-	exp.IngestedFrom = "server_localhost"
+	exp.IngestedFrom = s.serverInstanceName
 	timestamp := RunningTime{}
 
 	timestamp.Start = requestReceivedTime.UnixNano()
@@ -247,7 +248,7 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 		exp.Timestamp = timestamp
 		exp.Status = false
 		exp.Resolver = ""
-		go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+		go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -267,7 +268,8 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 	exp.Resolver = s.resolver[chosenResolver].getResolverServerName()
 	exp.Status = true
 
-	go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+	//go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+	go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
 
 	w.Header().Set("Content-Type", "application/oblivious-dns-message")
 	w.Write(packedResponseMessage)

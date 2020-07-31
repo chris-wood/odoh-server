@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud.google.com/go/logging"
 	"context"
 	"encoding/json"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -43,10 +44,12 @@ type telemetry struct {
 	sync.RWMutex
 	esClient *elasticsearch.Client
 	buffer []string
+	logClient *logging.Client
+	cloudlogger *logging.Logger
 }
 
 const (
-	INDEX = "telemetry"
+	INDEX = "server_telemetry"
 	TYPE = "client_localhost"
 )
 
@@ -66,7 +69,25 @@ func getTelemetryInstance() *telemetry {
 	if err != nil {
 		log.Fatalf("Unable to create an elasticsearch client connection.")
 	}
+	ctx := context.Background()
+	projectID := "odoh-target"
+	telemetryInstance.logClient, err = logging.NewClient(ctx, projectID)
+	if err != nil {
+		log.Fatalf("Unable to create a logging instance to Google Cloud")
+	}
+	logName := "odohserver-gcp"
+	telemetryInstance.cloudlogger = telemetryInstance.logClient.Logger(logName)
 	return &telemetryInstance
+}
+
+func (t *telemetry) streamTelemetryToGCPLogging(dataItems []string) {
+	//var wg sync.WaitGroup
+	defer t.cloudlogger.Flush()
+	for _, item := range dataItems {
+		log.Printf("Logging %v to the GCP instance\n", item)
+		t.cloudlogger.Log(logging.Entry{Payload: item})
+	}
+	//wg.Wait()
 }
 
 func (t *telemetry) streamDataToElastic(dataItems []string) {
