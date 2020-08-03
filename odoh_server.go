@@ -101,6 +101,11 @@ func main() {
 	}
 	log.Printf("Setting Server Name as %v", serverName)
 
+	var experimentID string
+	if experimentID := os.Getenv("EXPERIMENT_ID"); experimentID == "" {
+		experimentID = "EXP_LOCAL"
+	}
+
 	privateKey, err := odoh.DeriveFixedKeyPairFromSeed(kemID, kdfID, aeadID, seed)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
@@ -123,11 +128,12 @@ func main() {
 	}
 
 	target := &targetServer{
-		verbose: true,
-		resolver: resolversInUse,
-		odohKeyPair: privateKey,
-		telemetryClient: getTelemetryInstance(),
+		verbose:            true,
+		resolver:           resolversInUse,
+		odohKeyPair:        privateKey,
+		telemetryClient:    getTelemetryInstance(),
 		serverInstanceName: serverName,
+		experimentId:       experimentID,
 	}
 
 	proxy := &proxyServer{

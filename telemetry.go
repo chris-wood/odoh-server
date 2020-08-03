@@ -29,6 +29,8 @@ type experiment struct {
 	Timestamp    runningTime
 	Status       bool
 	IngestedFrom string
+	ExperimentID string
+	ProtocolType string
 }
 
 func (e *experiment) serialize() string {
