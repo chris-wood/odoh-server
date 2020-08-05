@@ -29,6 +29,7 @@ import (
 	"github.com/miekg/dns"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
 )
@@ -79,7 +80,7 @@ func (s *targetServer) parseQueryFromRequest(r *http.Request) (*dns.Msg, error) 
 	}
 }
 
-func (s *targetServer) resolveQuery(query *dns.Msg) ([]byte, error) {
+func (s *targetServer) resolveQuery(query *dns.Msg, chosenResolver int) ([]byte, error) {
 	packedQuery, err := query.Pack()
 	if err != nil {
 		log.Println("Failed encoding DNS query:", err)
@@ -91,7 +92,7 @@ func (s *targetServer) resolveQuery(query *dns.Msg) ([]byte, error) {
 	}
 
 	start := time.Now()
-	response, err := s.resolver[0].resolve(query)
+	response, err := s.resolver[chosenResolver].resolve(query)
 	elapsed := time.Now().Sub(start)
 
 	packedResponse, err := response.Pack()
@@ -138,19 +139,40 @@ func (s *targetServer) resolveQueryWithResolver(query *dns.Msg, resolver *target
 }
 
 func (s *targetServer) plainQueryHandler(w http.ResponseWriter, r *http.Request) {
+	availableResolvers := len(s.resolver)
+	chosenResolver := rand.Intn(availableResolvers)
+
+	requestReceivedTime := time.Now()
+	exp := experiment{}
+	exp.ExperimentID = s.experimentId
+	exp.IngestedFrom = s.serverInstanceName
+	exp.ProtocolType = "ODOHse"
+	timestamp := runningTime{}
+
+	timestamp.Start = requestReceivedTime.UnixNano()
 	query, err := s.parseQueryFromRequest(r)
 	if err != nil {
 		log.Println("Failed parsing request:", err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	timestamp.TargetQueryDecryptionTime = time.Now().UnixNano()
 
-	packedResponse, err := s.resolveQuery(query)
+	packedResponse, err := s.resolveQuery(query, chosenResolver)
 	if err != nil {
 		log.Println("Failed resolving DNS query:", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	timestamp.TargetQueryResolutionTime = time.Now().UnixNano()
+	timestamp.TargetAnswerEncryptionTime = time.Now().UnixNano()
+	timestamp.EndTime = time.Now().UnixNano()
+
+	exp.Timestamp = timestamp
+	exp.Resolver = s.resolver[chosenResolver].getResolverServerName()
+	exp.Status = true
+
+	go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
 
 	w.Header().Set("Content-Type", "application/dns-message")
 	w.Write(packedResponse)
