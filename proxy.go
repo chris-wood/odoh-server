@@ -92,6 +92,6 @@ func (p *proxyServer) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/oblivious-dns-message")
+	w.Header().Set("Content-Type", headerContentType)
 	w.Write(responseBody)
 }
