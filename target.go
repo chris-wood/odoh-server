@@ -147,6 +147,7 @@ func (s *targetServer) plainQueryHandler(w http.ResponseWriter, r *http.Request)
 	exp.ExperimentID = s.experimentId
 	exp.IngestedFrom = s.serverInstanceName
 	exp.ProtocolType = "ODOHse"
+	exp.RequestID = nil
 	timestamp := runningTime{}
 
 	timestamp.Start = requestReceivedTime.UnixNano()
