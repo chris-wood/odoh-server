@@ -79,6 +79,12 @@ func (s odohServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+		log.Printf("Defaulting to port %s", port)
+	}
+
 	var seed []byte
 	if seedHex := os.Getenv("SEED_SECRET_KEY"); seedHex != "" {
 		log.Printf("Using Secret Key Seed : [%v]", seedHex)
@@ -157,6 +163,6 @@ func main() {
 	http.HandleFunc(publicKeyEndpoint, target.publicKeyEndpointHandler)
 	http.HandleFunc("/", server.indexHandler)
 
-	log.Print("Listening on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Printf("Listening on port %v\n", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
