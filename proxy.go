@@ -34,7 +34,7 @@ type proxyServer struct {
 	client *http.Client
 }
 
-func forwardProxyRequest(clientInstance *http.Client, targetName string, targetPath string, body []byte, headerContentType string) ([]byte, error) {
+func forwardProxyRequest(client *http.Client, targetName string, targetPath string, body []byte, headerContentType string) ([]byte, error) {
 	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
 	if err != nil {
 		log.Println("Failed creating target POST request")
@@ -42,10 +42,9 @@ func forwardProxyRequest(clientInstance *http.Client, targetName string, targetP
 	}
 	req.Header.Set("Content-Type", headerContentType)
 
-	client := clientInstance
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("Failed to send proxied message")
+		log.Printf("Failed to send proxied message %v\n", err)
 		return nil, errors.New("failed to send proxied message")
 	}
 	defer resp.Body.Close()
@@ -54,7 +53,7 @@ func forwardProxyRequest(clientInstance *http.Client, targetName string, targetP
 	return responseBody, err
 }
 
-func (p *proxyServer) proxyHandler(w http.ResponseWriter, r *http.Request) {
+func (p *proxyServer) proxyQueryHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
 	if r.Method != "POST" {
@@ -92,6 +91,6 @@ func (p *proxyServer) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/oblivious-dns-message")
+	w.Header().Set("Content-Type", headerContentType)
 	w.Write(responseBody)
 }
