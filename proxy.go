@@ -53,7 +53,7 @@ func forwardProxyRequest(client *http.Client, targetName string, targetPath stri
 	return responseBody, err
 }
 
-func (p *proxyServer) proxyHandler(w http.ResponseWriter, r *http.Request) {
+func (p *proxyServer) proxyQueryHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
 	if r.Method != "POST" {

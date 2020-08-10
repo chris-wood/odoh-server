@@ -157,8 +157,8 @@ func main() {
 		DOHURI:    fmt.Sprintf("%s/%s", targetURI, queryEndpoint),
 	}
 
-	http.HandleFunc(queryEndpoint, target.queryHandler)
-	http.HandleFunc(proxyEndpoint, proxy.proxyHandler)
+	http.HandleFunc(queryEndpoint, target.targetQueryHandler)
+	http.HandleFunc(proxyEndpoint, proxy.proxyQueryHandler)
 	http.HandleFunc(healthEndpoint, server.healthCheckHandler)
 	http.HandleFunc(publicKeyEndpoint, target.publicKeyEndpointHandler)
 	http.HandleFunc("/", server.indexHandler)

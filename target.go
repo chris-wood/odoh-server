@@ -307,7 +307,7 @@ func (s *targetServer) serverWebPvD(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(webPvDString))
 }
 
-func (s *targetServer) queryHandler(w http.ResponseWriter, r *http.Request) {
+func (s *targetServer) targetQueryHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
 	targetName := r.URL.Query().Get("targethost")
