@@ -146,7 +146,7 @@ func (s *targetServer) plainQueryHandler(w http.ResponseWriter, r *http.Request)
 	exp := experiment{}
 	exp.ExperimentID = s.experimentId
 	exp.IngestedFrom = s.serverInstanceName
-	exp.ProtocolType = "ODOHse"
+	exp.ProtocolType = "ClearText-ODOH"
 	exp.RequestID = nil
 	timestamp := runningTime{}
 
@@ -165,9 +165,10 @@ func (s *targetServer) plainQueryHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	timestamp.TargetQueryResolutionTime = time.Now().UnixNano()
-	timestamp.TargetAnswerEncryptionTime = time.Now().UnixNano()
-	timestamp.EndTime = time.Now().UnixNano()
+	endTime := time.Now().UnixNano()
+	timestamp.TargetQueryResolutionTime = endTime
+	timestamp.TargetAnswerEncryptionTime = endTime
+	timestamp.EndTime = endTime
 
 	exp.Timestamp = timestamp
 	exp.Resolver = s.resolver[chosenResolver].getResolverServerName()
