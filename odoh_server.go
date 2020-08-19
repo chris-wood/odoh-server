@@ -127,7 +127,7 @@ func main() {
 
 	for index := 0; index < len(nameServers); index++ {
 		resolver := &targetResolver{
-			timeout: 2500 * time.Millisecond,
+			timeout:    2500 * time.Millisecond,
 			nameserver: nameServers[index],
 		}
 		resolversInUse[index] = resolver

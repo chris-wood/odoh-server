@@ -16,11 +16,11 @@ import (
 // 1. Start => Epoch time at which the request is received by the ObliviousDNSHandler
 // 2. TargetQueryDecryptionTime => Epoch
 type runningTime struct {
-	Start int64
-	TargetQueryDecryptionTime int64
-	TargetQueryResolutionTime int64
+	Start                      int64
+	TargetQueryDecryptionTime  int64
+	TargetQueryResolutionTime  int64
 	TargetAnswerEncryptionTime int64
-	EndTime int64
+	EndTime                    int64
 }
 
 type experiment struct {
@@ -44,22 +44,22 @@ func (e *experiment) serialize() string {
 
 type telemetry struct {
 	sync.RWMutex
-	esClient *elasticsearch.Client
-	buffer []string
-	logClient *logging.Client
+	esClient    *elasticsearch.Client
+	buffer      []string
+	logClient   *logging.Client
 	cloudlogger *logging.Logger
 }
 
 const (
 	INDEX = "server_telemetry"
-	TYPE = "client_localhost"
+	TYPE  = "client_localhost"
 )
 
 var telemetryInstance telemetry
 
 func getTelemetryInstance() *telemetry {
 	elasticsearchTransport := elasticsearch.Config{
-		Addresses: []string {
+		Addresses: []string{
 			"http://localhost:9200",
 		},
 		Transport: &http.Transport{
@@ -97,8 +97,8 @@ func (t *telemetry) streamDataToElastic(dataItems []string) {
 		go func(i int, message string) {
 			defer wg.Done()
 			req := esapi.IndexRequest{
-				Index: INDEX,
-				Body: strings.NewReader(message),
+				Index:   INDEX,
+				Body:    strings.NewReader(message),
 				Refresh: "true",
 			}
 
