@@ -24,3 +24,10 @@ To stream logs when deployed, run
 ~~~
 $ gcloud app logs tail -s default
 ~~~
+
+To run locally build and run the project using
+
+```shell
+go build
+PORT=8080 ./odoh_server
+```

@@ -244,7 +244,7 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	exp.RequestID = obliviousQuery.ResponseKey
-	chosenResolver := int(obliviousQuery.ResponseKey[len(obliviousQuery.ResponseKey) - 1]) % len(nameServers)
+	chosenResolver := int(obliviousQuery.ResponseKey[len(obliviousQuery.ResponseKey)-1]) % len(nameServers)
 
 	query, err := decodeDNSQuestion(obliviousQuery.Message())
 	if err != nil {

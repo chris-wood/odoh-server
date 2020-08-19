@@ -35,7 +35,7 @@ type proxyServer struct {
 }
 
 func forwardProxyRequest(client *http.Client, targetName string, targetPath string, body []byte, headerContentType string) ([]byte, error) {
-	req, err := http.NewRequest("POST", "https://" + targetName + targetPath, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "https://"+targetName+targetPath, bytes.NewReader(body))
 	if err != nil {
 		log.Println("Failed creating target POST request")
 		return nil, errors.New("failed creating target POST request")
