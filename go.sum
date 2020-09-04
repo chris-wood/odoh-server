@@ -43,6 +43,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/chris-wood/odoh v0.0.0-20200724231530-0ed46d9d2387 h1:4SJlVAvEgzXBDBckpBQCyqNyyA/ixqSsoTopkJGLov8=
 github.com/chris-wood/odoh v0.0.0-20200724231530-0ed46d9d2387/go.mod h1:uj93pPykgQ+WC/h9KQDNW6o76g2l28stR+UNQEOj1Uc=
+github.com/chris-wood/odoh v0.0.0-20200904213540-aa350f1a2166 h1:/iMLgXmLJwGKU2pHuaAiJ5uRScsD1oV4+m2l9BHApEk=
+github.com/chris-wood/odoh v0.0.0-20200904213540-aa350f1a2166/go.mod h1:uj93pPykgQ+WC/h9KQDNW6o76g2l28stR+UNQEOj1Uc=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=

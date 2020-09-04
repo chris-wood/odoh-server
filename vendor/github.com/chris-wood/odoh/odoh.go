@@ -26,7 +26,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"github.com/cisco/go-hpke"
 	"log"
 )
@@ -51,9 +51,7 @@ func (k ObliviousDNSPublicKey) KeyID() []byte {
 	h.Write(message)
 	keyIdHash := h.Sum(nil)
 
-	result := make([]byte, 2)
-	binary.BigEndian.PutUint16(result, uint16(len(keyIdHash)))
-	return append(result, keyIdHash...)
+	return keyIdHash
 }
 
 func (k ObliviousDNSPublicKey) Marshal() []byte {
@@ -73,7 +71,7 @@ func UnMarshalObliviousDNSPublicKey(buffer []byte) ObliviousDNSPublicKey {
 	AeadId := binary.BigEndian.Uint16(buffer[4:])
 	pkLen := binary.BigEndian.Uint16(buffer[6:])
 
-	pkBytes := buffer[8:8+pkLen]
+	pkBytes := buffer[8 : 8+pkLen]
 
 	var KemID hpke.KEMID
 	var KdfID hpke.KDFID
@@ -81,39 +79,51 @@ func UnMarshalObliviousDNSPublicKey(buffer []byte) ObliviousDNSPublicKey {
 
 	switch kemId {
 	case 0x0010:
-		KemID = hpke.DHKEM_P256; break
+		KemID = hpke.DHKEM_P256
+		break
 	case 0x0012:
-		KemID = hpke.DHKEM_P521; break
+		KemID = hpke.DHKEM_P521
+		break
 	case 0x0020:
-		KemID = hpke.DHKEM_X25519; break
+		KemID = hpke.DHKEM_X25519
+		break
 	case 0x0021:
-		KemID = hpke.DHKEM_X448; break
+		KemID = hpke.DHKEM_X448
+		break
 	case 0xFFFE:
-		KemID = hpke.KEM_SIKE503;break
+		KemID = hpke.KEM_SIKE503
+		break
 	case 0xFFFF:
-		KemID = hpke.KEM_SIKE751;break
+		KemID = hpke.KEM_SIKE751
+		break
 	default:
 		log.Fatalln("Unable to find the correct KEM ID Type")
 	}
 
 	switch kdfId {
 	case 0x0001:
-		KdfID = hpke.KDF_HKDF_SHA256; break
+		KdfID = hpke.KDF_HKDF_SHA256
+		break
 	case 0x0002:
-		KdfID = hpke.KDF_HKDF_SHA384; break
+		KdfID = hpke.KDF_HKDF_SHA384
+		break
 	case 0x0003:
-		KdfID = hpke.KDF_HKDF_SHA512; break
+		KdfID = hpke.KDF_HKDF_SHA512
+		break
 	default:
 		log.Fatalln("Unable to find correct KDF ID Type")
 	}
 
 	switch AeadId {
 	case 0x0001:
-		AeadID = hpke.AEAD_AESGCM128; break
+		AeadID = hpke.AEAD_AESGCM128
+		break
 	case 0x0002:
-		AeadID = hpke.AEAD_AESGCM256; break
+		AeadID = hpke.AEAD_AESGCM256
+		break
 	case 0x0003:
-		AeadID = hpke.AEAD_CHACHA20POLY1305; break
+		AeadID = hpke.AEAD_CHACHA20POLY1305
+		break
 	default:
 		log.Fatalln("Unable to find correct AEAD ID Type")
 	}
@@ -204,15 +214,8 @@ func (targetKey ObliviousDNSPublicKey) EncryptQuery(query ObliviousDNSQuery) (Ob
 	}
 
 	encodedMessage := query.Marshal()
-	fmt.Printf("enc : [%v] %x\n", len(enc), enc)
-	fmt.Printf("Encoded Message : [%v] %x\n", len(encodedMessage), encodedMessage)
 	aad := append([]byte{0x01}, targetKey.KeyID()...)
-	fmt.Printf("AAD : [%v] %x\n", len(aad), aad)
 	ct := ctxI.Seal(aad, encodedMessage)
-	fmt.Printf("CT: [%v] %x\n", len(ct), ct)
-
-	encct := append(enc, ct...)
-	fmt.Printf("[enc+ct] [%v] %x\n", len(encct), encct)
 
 	return ObliviousDNSMessage{
 		MessageType:      QueryType,
@@ -227,12 +230,9 @@ func (privateKey ObliviousDNSKeyPair) DecryptQuery(message ObliviousDNSMessage) 
 		return nil, err
 	}
 
-	log.Printf("PublicKey = %x\n", privateKey.PublicKey.PublicKeyBytes)
-
-	enc := message.EncryptedMessage[0:32]
-	ct := message.EncryptedMessage[32:]
-	log.Printf("enc = %x\n", enc)
-	log.Printf("ct = %x\n", ct)
+	keySize := suite.KEM.PublicKeySize()
+	enc := message.EncryptedMessage[0:keySize]
+	ct := message.EncryptedMessage[keySize:]
 
 	ctxR, err := hpke.SetupBaseR(suite, privateKey.SecretKey, enc, []byte("odns-query"))
 	if err != nil {
@@ -241,7 +241,6 @@ func (privateKey ObliviousDNSKeyPair) DecryptQuery(message ObliviousDNSMessage) 
 	}
 
 	aad := append([]byte{byte(QueryType)}, privateKey.PublicKey.KeyID()...)
-	log.Printf("aad = %x\n", aad)
 
 	dnsMessage, err := ctxR.Open(aad, ct)
 	if err != nil {
@@ -249,4 +248,81 @@ func (privateKey ObliviousDNSKeyPair) DecryptQuery(message ObliviousDNSMessage) 
 	}
 
 	return UnmarshalQueryBody(dnsMessage)
+}
+
+type QueryContext struct {
+	key       []byte
+	publicKey ObliviousDNSPublicKey
+}
+
+func lookupAeadKeySizeByAeadID(id hpke.AEADID) int {
+	switch id {
+	case hpke.AEAD_AESGCM128:
+		return 16
+	case hpke.AEAD_AESGCM256:
+		return 32
+	case hpke.AEAD_CHACHA20POLY1305:
+		return 32
+	default:
+		return 0
+	}
+}
+
+func createQueryContext(publicKey ObliviousDNSPublicKey) QueryContext {
+	keySize := lookupAeadKeySizeByAeadID(publicKey.AeadID)
+	if keySize == 0 {
+		return QueryContext{
+			key:       nil,
+			publicKey: publicKey,
+		}
+	}
+	responseKey := make([]byte, keySize)
+	_, err := rand.Read(responseKey)
+	if err != nil {
+		return QueryContext{
+			key:       nil,
+			publicKey: publicKey,
+		}
+	}
+	return QueryContext{
+		key:       responseKey,
+		publicKey: publicKey,
+	}
+}
+
+func SealQuery(dnsQuery []byte, publicKey ObliviousDNSPublicKey) ([]byte, QueryContext, error) {
+	queryContext := createQueryContext(publicKey)
+	odohQuery := ObliviousDNSQuery{
+		ResponseKey: queryContext.key,
+		DnsMessage:  dnsQuery,
+	}
+
+	odnsMessage, err := queryContext.publicKey.EncryptQuery(odohQuery)
+	if err != nil {
+		log.Fatalf("Unable to Encrypt oDoH Question with provided Public Key of Resolver")
+		return nil, queryContext, err
+	}
+
+	return odnsMessage.Marshal(), queryContext, nil
+}
+
+func (c QueryContext) OpenAnswer(encryptedDnsAnswer []byte) ([]byte, error) {
+	message := CreateObliviousDNSMessage(ResponseType, []byte{}, encryptedDnsAnswer)
+	odohResponse := ObliviousDNSResponse{ResponseKey: c.key}
+	responseMessageType := message.MessageType
+	if responseMessageType != ResponseType {
+		return nil, errors.New("answer is not a valid response type")
+	}
+	encryptedResponse := message.EncryptedMessage
+
+	responseKeyId := []byte{0x00, 0x00}
+	aad := append([]byte{0x02}, responseKeyId...) // message_type = 0x02, with an empty keyID
+
+	suite, err := hpke.AssembleCipherSuite(c.publicKey.KemID, c.publicKey.KdfID, c.publicKey.AeadID)
+
+	decryptedResponse, err := odohResponse.DecryptResponse(suite, aad, encryptedResponse)
+	if err != nil {
+		return nil, errors.New("unable to decrypt the obtained response using the symmetric key sent")
+	}
+	return decryptedResponse, nil
 }

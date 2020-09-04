@@ -28,7 +28,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/cisco/go-hpke"
-	"log"
 )
 
 type ObliviousMessageType uint8
@@ -87,12 +86,6 @@ func (m ObliviousDNSQuery) EncryptResponse(suite hpke.CipherSuite, aad, response
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, response, aad)
-
-	log.Printf("EncryptResponse key: %x\n", m.ResponseKey)
-	log.Printf("EncryptResponse nonce: %x\n", nonce)
-	log.Printf("EncryptResponse aad: %x\n", aad)
-	log.Printf("EncryptResponse plaintext: %x\n", response)
-	log.Printf("EncryptResponse ciphertext: %x\n", ciphertext)
 
 	return ciphertext, nil
 }
