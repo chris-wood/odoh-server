@@ -57,28 +57,34 @@ const (
 
 var telemetryInstance telemetry
 
-func getTelemetryInstance() *telemetry {
-	elasticsearchTransport := elasticsearch.Config{
-		Addresses: []string{
-			"http://localhost:9200",
-		},
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-		},
-	}
+func getTelemetryInstance(telemetryType string) *telemetry {
 	var err error
-	telemetryInstance.esClient, err = elasticsearch.NewClient(elasticsearchTransport)
-	if err != nil {
-		log.Fatalf("Unable to create an elasticsearch client connection.")
+	if telemetryType == "ELK" {
+		elasticsearchTransport := elasticsearch.Config{
+			Addresses: []string{
+				"http://localhost:9200",
+			},
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+			},
+		}
+		telemetryInstance.esClient, err = elasticsearch.NewClient(elasticsearchTransport)
+		if err != nil {
+			log.Fatalf("Unable to create an elasticsearch client connection.")
+		}
+	} else if telemetryType == "GCP" {
+		ctx := context.Background()
+		projectID := "odoh-target"
+		telemetryInstance.logClient, err = logging.NewClient(ctx, projectID)
+		if err != nil {
+			log.Fatalf("Unable to create a logging instance to Google Cloud %v", err)
+		}
+		logName := "odohserver-gcp"
+		telemetryInstance.cloudlogger = telemetryInstance.logClient.Logger(logName)
+	} else {
+		telemetryInstance.cloudlogger = nil
+		telemetryInstance.esClient = nil
 	}
-	ctx := context.Background()
-	projectID := "odoh-target"
-	telemetryInstance.logClient, err = logging.NewClient(ctx, projectID)
-	if err != nil {
-		log.Fatalf("Unable to create a logging instance to Google Cloud")
-	}
-	logName := "odohserver-gcp"
-	telemetryInstance.cloudlogger = telemetryInstance.logClient.Logger(logName)
 	return &telemetryInstance
 }
 
