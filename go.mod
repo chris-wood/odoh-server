@@ -3,6 +3,7 @@ module github.com/chris-wood/odoh-server
 go 1.14
 
 // +heroku goVersion go1.14
+// +scalingo goVersion go1.14
 
 require (
 	cloud.google.com/go v0.61.0 // indirect
