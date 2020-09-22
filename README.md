@@ -2,6 +2,10 @@
 
 [Oblivious DoH Server](https://tools.ietf.org/html/draft-pauly-dprive-oblivious-doh)
 
+# Preconfigured Deployments
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+
 # Usage
 
 To deploy, run:
