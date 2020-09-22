@@ -112,6 +112,11 @@ func main() {
 		experimentID = "EXP_LOCAL"
 	}
 
+	var telemetryType string
+	if telemetryType := os.Getenv("TELEMETRY_TYPE"); telemetryType == "" {
+		telemetryType = "LOG"
+	}
+
 	privateKey, err := odoh.DeriveFixedKeyPairFromSeed(kemID, kdfID, aeadID, seed)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
@@ -137,7 +142,7 @@ func main() {
 		verbose:            true,
 		resolver:           resolversInUse,
 		odohKeyPair:        privateKey,
-		telemetryClient:    getTelemetryInstance(),
+		telemetryClient:    getTelemetryInstance(telemetryType),
 		serverInstanceName: serverName,
 		experimentId:       experimentID,
 	}

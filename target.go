@@ -174,7 +174,11 @@ func (s *targetServer) plainQueryHandler(w http.ResponseWriter, r *http.Request)
 	exp.Resolver = s.resolver[chosenResolver].getResolverServerName()
 	exp.Status = true
 
-	go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
+	if s.telemetryClient.logClient != nil {
+		go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
+	} else if s.telemetryClient.esClient != nil {
+		go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+	}
 
 	w.Header().Set("Content-Type", "application/dns-message")
 	w.Write(packedResponse)
@@ -275,7 +279,11 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 		exp.Timestamp = timestamp
 		exp.Status = false
 		exp.Resolver = ""
-		go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
+		if s.telemetryClient.logClient != nil {
+			go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
+		} else if s.telemetryClient.esClient != nil {
+			go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+		}
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -295,8 +303,11 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 	exp.Resolver = s.resolver[chosenResolver].getResolverServerName()
 	exp.Status = true
 
-	//go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
-	go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
+	if s.telemetryClient.logClient != nil {
+		go s.telemetryClient.streamTelemetryToGCPLogging([]string{exp.serialize()})
+	} else if s.telemetryClient.esClient != nil {
+		go s.telemetryClient.streamDataToElastic([]string{exp.serialize()})
+	}
 
 	w.Header().Set("Content-Type", "application/oblivious-dns-message")
 	w.Write(packedResponseMessage)
