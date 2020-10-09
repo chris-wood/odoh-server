@@ -24,37 +24,111 @@ package odoh
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/binary"
 	"errors"
 	"github.com/cisco/go-hpke"
 	"log"
 )
 
-type ObliviousDNSPublicKey struct {
+const (
+	ODOH_VERSION                    = uint16(0xff02)
+	ODOH_SECRET_LENGTH              = 32
+	ODOH_PADDING_BYTE               = uint8(0)
+	ODOH_LABEL_KEY_ID               = "odoh key id"
+	ODOH_LABEL_KEY                  = "odoh key"
+	ODOH_LABEL_NONCE                = "odoh nonce"
+	ODOH_LABEL_SECRET               = "odoh secret"
+	ODOH_LABEL_QUERY                = "odoh query"
+	ODOH_DEFAULT_KEMID  hpke.KEMID  = hpke.DHKEM_X25519
+	ODOH_DEFAULT_KDFID  hpke.KDFID  = hpke.KDF_HKDF_SHA256
+	ODOH_DEFAULT_AEADID hpke.AEADID = hpke.AEAD_AESGCM128
+)
+
+type ObliviousDoHConfigContents struct {
 	KemID          hpke.KEMID
 	KdfID          hpke.KDFID
 	AeadID         hpke.AEADID
 	PublicKeyBytes []byte
 }
 
-func (k ObliviousDNSPublicKey) KeyID() []byte {
-	h := sha256.New()
+func CreateObliviousDoHConfigContents(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID, publicKeyBytes []byte) (ObliviousDoHConfigContents, error) {
+	suite, err := hpke.AssembleCipherSuite(kemID, kdfID, aeadID)
+	if err != nil {
+		return ObliviousDoHConfigContents{}, err
+	}
+
+	_, err = suite.KEM.Deserialize(publicKeyBytes)
+	if err != nil {
+		return ObliviousDoHConfigContents{}, err
+	}
+
+	return ObliviousDoHConfigContents{
+		KemID:          kemID,
+		KdfID:          kdfID,
+		AeadID:         aeadID,
+		PublicKeyBytes: publicKeyBytes,
+	}, nil
+}
+
+type ObliviousDoHConfig struct {
+	Version  uint16
+	Contents ObliviousDoHConfigContents
+}
+
+func CreateObliviousDoHConfig(contents ObliviousDoHConfigContents) ObliviousDoHConfig {
+	return ObliviousDoHConfig{
+		Version:  ODOH_VERSION,
+		Contents: contents,
+	}
+}
+
+func (c ObliviousDoHConfig) Marshal() []byte {
+	marshalledConfig := c.Contents.Marshal()
+
+	buffer := make([]byte, 4)
+	binary.BigEndian.PutUint16(buffer[0:], uint16(c.Version))
+	binary.BigEndian.PutUint16(buffer[2:], uint16(len(marshalledConfig)))
+
+	configBytes := append(buffer, marshalledConfig...)
+	return configBytes
+}
+
+func UnmarshalObliviousDoHConfig(buffer []byte) (ObliviousDoHConfig, error) {
+	version := binary.BigEndian.Uint16(buffer[0:])
+	length := binary.BigEndian.Uint16(buffer[2:])
+	if len(buffer[4:]) < int(length) {
+		return ObliviousDoHConfig{}, errors.New("Invalid serialized ObliviousDoHConfig")
+	}
+
+	configContents := UnmarshalObliviousDoHConfigContents(buffer[4:])
+
+	return ObliviousDoHConfig{
+		Version:  version,
+		Contents: configContents,
+	}, nil
+}
+
+func (k ObliviousDoHConfigContents) KeyID() []byte {
+	suite, err := hpke.AssembleCipherSuite(k.KemID, k.KdfID, k.AeadID)
+	if err != nil {
+		return nil
+	}
 
 	identifiers := make([]byte, 8)
 	binary.BigEndian.PutUint16(identifiers[0:], uint16(k.KemID))
 	binary.BigEndian.PutUint16(identifiers[2:], uint16(k.KdfID))
 	binary.BigEndian.PutUint16(identifiers[4:], uint16(k.AeadID))
 	binary.BigEndian.PutUint16(identifiers[6:], uint16(len(k.PublicKeyBytes)))
-	message := append(identifiers, k.PublicKeyBytes...)
+	config := append(identifiers, k.PublicKeyBytes...)
 
-	h.Write(message)
-	keyIdHash := h.Sum(nil)
+	prk := suite.KDF.Extract(nil, config)
+	identifier := suite.KDF.Expand(prk, []byte(ODOH_LABEL_KEY_ID), suite.KDF.OutputSize())
 
-	return keyIdHash
+	return identifier
 }
 
-func (k ObliviousDNSPublicKey) Marshal() []byte {
+func (k ObliviousDoHConfigContents) Marshal() []byte {
 	identifiers := make([]byte, 8)
 	binary.BigEndian.PutUint16(identifiers[0:], uint16(k.KemID))
 	binary.BigEndian.PutUint16(identifiers[2:], uint16(k.KdfID))
@@ -65,7 +139,7 @@ func (k ObliviousDNSPublicKey) Marshal() []byte {
 	return response
 }
 
-func UnMarshalObliviousDNSPublicKey(buffer []byte) ObliviousDNSPublicKey {
+func UnmarshalObliviousDoHConfigContents(buffer []byte) ObliviousDoHConfigContents {
 	kemId := binary.BigEndian.Uint16(buffer[0:])
 	kdfId := binary.BigEndian.Uint16(buffer[2:])
 	AeadId := binary.BigEndian.Uint16(buffer[4:])
@@ -128,7 +202,7 @@ func UnMarshalObliviousDNSPublicKey(buffer []byte) ObliviousDNSPublicKey {
 		log.Fatalln("Unable to find correct AEAD ID Type")
 	}
 
-	return ObliviousDNSPublicKey{
+	return ObliviousDoHConfigContents{
 		KemID:          KemID,
 		KdfID:          KdfID,
 		AeadID:         AeadID,
@@ -136,193 +210,252 @@ func UnMarshalObliviousDNSPublicKey(buffer []byte) ObliviousDNSPublicKey {
 	}
 }
 
-func (k ObliviousDNSPublicKey) GetPublicKeyBytes() []byte {
+func (k ObliviousDoHConfigContents) PublicKey() []byte {
 	return k.PublicKeyBytes
 }
 
-func (k ObliviousDNSPublicKey) CipherSuite() (hpke.CipherSuite, error) {
+func (k ObliviousDoHConfigContents) CipherSuite() (hpke.CipherSuite, error) {
 	return hpke.AssembleCipherSuite(k.KemID, k.KdfID, k.AeadID)
 }
 
-type ObliviousDNSKeyPair struct {
-	PublicKey ObliviousDNSPublicKey
-	SecretKey hpke.KEMPrivateKey
+type ObliviousDoHKeyPair struct {
+	Config    ObliviousDoHConfig
+	secretKey hpke.KEMPrivateKey
+	Seed      []byte
 }
 
-func (k ObliviousDNSKeyPair) CipherSuite() (hpke.CipherSuite, error) {
-	return hpke.AssembleCipherSuite(k.PublicKey.KemID, k.PublicKey.KdfID, k.PublicKey.AeadID)
-}
-
-func DeriveFixedKeyPairFromSeed(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID, ikm []byte) (ObliviousDNSKeyPair, error) {
+func CreateKeyPairFromSeed(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID, ikm []byte) (ObliviousDoHKeyPair, error) {
 	suite, err := hpke.AssembleCipherSuite(kemID, kdfID, aeadID)
 	if err != nil {
-		return ObliviousDNSKeyPair{}, err
+		return ObliviousDoHKeyPair{}, err
 	}
 
 	sk, pk, err := suite.KEM.DeriveKeyPair(ikm)
 	if err != nil {
-		return ObliviousDNSKeyPair{}, err
+		return ObliviousDoHKeyPair{}, err
 	}
 
-	publicKey := ObliviousDNSPublicKey{
-		KemID:          kemID,
-		KdfID:          kdfID,
-		AeadID:         aeadID,
-		PublicKeyBytes: suite.KEM.Serialize(pk),
+	config := ObliviousDoHConfig{
+		Contents: ObliviousDoHConfigContents{
+			KemID:          kemID,
+			KdfID:          kdfID,
+			AeadID:         aeadID,
+			PublicKeyBytes: suite.KEM.Serialize(pk),
+		},
 	}
 
-	return ObliviousDNSKeyPair{publicKey, sk}, nil
+	return ObliviousDoHKeyPair{
+		Config:    config,
+		secretKey: sk,
+		Seed:      ikm,
+	}, nil
 }
 
-func CreateKeyPair(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID) (ObliviousDNSKeyPair, error) {
+func CreateDefaultKeyPairFromSeed(seed []byte) (ObliviousDoHKeyPair, error) {
+	return CreateKeyPairFromSeed(ODOH_DEFAULT_KEMID, ODOH_DEFAULT_KDFID, ODOH_DEFAULT_AEADID, seed)
+}
+
+func CreateKeyPair(kemID hpke.KEMID, kdfID hpke.KDFID, aeadID hpke.AEADID) (ObliviousDoHKeyPair, error) {
 	suite, err := hpke.AssembleCipherSuite(kemID, kdfID, aeadID)
 	if err != nil {
-		return ObliviousDNSKeyPair{}, err
+		return ObliviousDoHKeyPair{}, err
 	}
 
 	ikm := make([]byte, suite.KEM.PrivateKeySize())
 	rand.Reader.Read(ikm)
 	sk, pk, err := suite.KEM.DeriveKeyPair(ikm)
 	if err != nil {
-		return ObliviousDNSKeyPair{}, err
+		return ObliviousDoHKeyPair{}, err
 	}
 
-	publicKey := ObliviousDNSPublicKey{
-		KemID:          kemID,
-		KdfID:          kdfID,
-		AeadID:         aeadID,
-		PublicKeyBytes: suite.KEM.Serialize(pk),
+	config := ObliviousDoHConfig{
+		Contents: ObliviousDoHConfigContents{
+			KemID:          kemID,
+			KdfID:          kdfID,
+			AeadID:         aeadID,
+			PublicKeyBytes: suite.KEM.Serialize(pk),
+		},
 	}
 
-	return ObliviousDNSKeyPair{publicKey, sk}, nil
+	return ObliviousDoHKeyPair{config, sk, ikm}, nil
 }
 
-func (targetKey ObliviousDNSPublicKey) EncryptQuery(query ObliviousDNSQuery) (ObliviousDNSMessage, error) {
-	suite, err := hpke.AssembleCipherSuite(targetKey.KemID, targetKey.KdfID, targetKey.AeadID)
+func CreateDefaultKeyPair() (ObliviousDoHKeyPair, error) {
+	return CreateKeyPair(ODOH_DEFAULT_KEMID, ODOH_DEFAULT_KDFID, ODOH_DEFAULT_AEADID)
+}
+
+type QueryContext struct {
+	odohSecret []byte
+	suite      hpke.CipherSuite
+	query      []byte
+	publicKey  ObliviousDoHConfigContents
+}
+
+func (c QueryContext) DecryptResponse(message ObliviousDNSMessage) ([]byte, error) {
+	aad := append([]byte{byte(ResponseType)}, []byte{0x00, 0x00}...) // 0-length encoded KeyID
+
+	odohPRK := c.suite.KDF.Extract(c.query, c.odohSecret)
+	key := c.suite.KDF.Expand(odohPRK, []byte(ODOH_LABEL_KEY), c.suite.AEAD.KeySize())
+	nonce := c.suite.KDF.Expand(odohPRK, []byte(ODOH_LABEL_NONCE), c.suite.AEAD.NonceSize())
+
+	aead, err := c.suite.AEAD.New(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return aead.Open(nil, nonce, message.EncryptedMessage, aad)
+}
+
+type ResponseContext struct {
+	query      []byte
+	suite      hpke.CipherSuite
+	odohSecret []byte
+}
+
+func (c ResponseContext) EncryptResponse(response *ObliviousDNSResponse) (ObliviousDNSMessage, error) {
+	aad := append([]byte{byte(ResponseType)}, []byte{0x00, 0x00}...) // 0-length encoded KeyID
+
+	odohPRK := c.suite.KDF.Extract(c.query, c.odohSecret)
+	key := c.suite.KDF.Expand(odohPRK, []byte(ODOH_LABEL_KEY), c.suite.AEAD.KeySize())
+	nonce := c.suite.KDF.Expand(odohPRK, []byte(ODOH_LABEL_NONCE), c.suite.AEAD.NonceSize())
+
+	aead, err := c.suite.AEAD.New(key)
 	if err != nil {
 		return ObliviousDNSMessage{}, err
+	}
+
+	ciphertext := aead.Seal(nil, nonce, response.Marshal(), aad)
+
+	odohMessage := ObliviousDNSMessage{
+		KeyID:            nil,
+		MessageType:      ResponseType,
+		EncryptedMessage: ciphertext,
+	}
+
+	return odohMessage, nil
+}
+
+func (targetKey ObliviousDoHConfigContents) EncryptQuery(query *ObliviousDNSQuery) (ObliviousDNSMessage, QueryContext, error) {
+	suite, err := hpke.AssembleCipherSuite(targetKey.KemID, targetKey.KdfID, targetKey.AeadID)
+	if err != nil {
+		return ObliviousDNSMessage{}, QueryContext{}, err
 	}
 
 	pkR, err := suite.KEM.Deserialize(targetKey.PublicKeyBytes)
 	if err != nil {
-		return ObliviousDNSMessage{}, err
+		return ObliviousDNSMessage{}, QueryContext{}, err
 	}
 
-	enc, ctxI, err := hpke.SetupBaseS(suite, rand.Reader, pkR, []byte("odns-query"))
+	enc, ctxI, err := hpke.SetupBaseS(suite, rand.Reader, pkR, []byte(ODOH_LABEL_QUERY))
 	if err != nil {
-		return ObliviousDNSMessage{}, err
+		return ObliviousDNSMessage{}, QueryContext{}, err
 	}
+
+	keyID := targetKey.KeyID()
+	keyIDLength := make([]byte, 2)
+	binary.BigEndian.PutUint16(keyIDLength, uint16(len(keyID)))
+	aad := append([]byte{byte(QueryType)}, keyIDLength...)
+	aad = append(aad, keyID...)
 
 	encodedMessage := query.Marshal()
-	aad := append([]byte{0x01}, targetKey.KeyID()...)
 	ct := ctxI.Seal(aad, encodedMessage)
+	odohSecret := ctxI.Export([]byte(ODOH_LABEL_SECRET), ODOH_SECRET_LENGTH)
 
 	return ObliviousDNSMessage{
-		MessageType:      QueryType,
-		KeyID:            targetKey.KeyID(),
-		EncryptedMessage: append(enc, ct...),
-	}, nil
+			KeyID:            targetKey.KeyID(),
+			MessageType:      QueryType,
+			EncryptedMessage: append(enc, ct...),
+		}, QueryContext{
+			odohSecret: odohSecret,
+			suite:      suite,
+			query:      query.Marshal(),
+			publicKey:  targetKey,
+		}, nil
 }
 
-func (privateKey ObliviousDNSKeyPair) DecryptQuery(message ObliviousDNSMessage) (*ObliviousDNSQuery, error) {
-	suite, err := hpke.AssembleCipherSuite(privateKey.PublicKey.KemID, privateKey.PublicKey.KdfID, privateKey.PublicKey.AeadID)
+func validateMessagePadding(padding []byte) bool {
+	validPadding := 1
+	for _, v := range padding {
+		validPadding &= subtle.ConstantTimeByteEq(v, ODOH_PADDING_BYTE)
+	}
+	return validPadding == 1
+}
+
+func (privateKey ObliviousDoHKeyPair) DecryptQuery(message ObliviousDNSMessage) (*ObliviousDNSQuery, ResponseContext, error) {
+	if message.MessageType != QueryType {
+		return nil, ResponseContext{}, errors.New("message is not a query")
+	}
+
+	suite, err := hpke.AssembleCipherSuite(privateKey.Config.Contents.KemID, privateKey.Config.Contents.KdfID, privateKey.Config.Contents.AeadID)
 	if err != nil {
-		return nil, err
+		return nil, ResponseContext{}, err
 	}
 
 	keySize := suite.KEM.PublicKeySize()
 	enc := message.EncryptedMessage[0:keySize]
 	ct := message.EncryptedMessage[keySize:]
 
-	ctxR, err := hpke.SetupBaseR(suite, privateKey.SecretKey, enc, []byte("odns-query"))
+	ctxR, err := hpke.SetupBaseR(suite, privateKey.secretKey, enc, []byte(ODOH_LABEL_QUERY))
 	if err != nil {
-		log.Printf("Bailed here. %v", err)
-		return nil, err
+		return nil, ResponseContext{}, err
 	}
 
-	aad := append([]byte{byte(QueryType)}, privateKey.PublicKey.KeyID()...)
+	odohSecret := ctxR.Export([]byte(ODOH_LABEL_SECRET), ODOH_SECRET_LENGTH)
+
+	keyID := privateKey.Config.Contents.KeyID()
+	keyIDLength := make([]byte, 2)
+	binary.BigEndian.PutUint16(keyIDLength, uint16(len(keyID)))
+	aad := append([]byte{byte(QueryType)}, keyIDLength...)
+	aad = append(aad, keyID...)
 
 	dnsMessage, err := ctxR.Open(aad, ct)
 	if err != nil {
-		return nil, err
+		return nil, ResponseContext{}, err
 	}
 
-	return UnmarshalQueryBody(dnsMessage)
-}
-
-type QueryContext struct {
-	key       []byte
-	publicKey ObliviousDNSPublicKey
-}
-
-func lookupAeadKeySizeByAeadID(id hpke.AEADID) int {
-	switch id {
-	case hpke.AEAD_AESGCM128:
-		return 16
-	case hpke.AEAD_AESGCM256:
-		return 32
-	case hpke.AEAD_CHACHA20POLY1305:
-		return 32
-	default:
-		return 0
-	}
-}
-
-func createQueryContext(publicKey ObliviousDNSPublicKey) QueryContext {
-	keySize := lookupAeadKeySizeByAeadID(publicKey.AeadID)
-	if keySize == 0 {
-		return QueryContext{
-			key:       nil,
-			publicKey: publicKey,
-		}
-	}
-	responseKey := make([]byte, keySize)
-	_, err := rand.Read(responseKey)
+	query, err := UnmarshalQueryBody(dnsMessage)
 	if err != nil {
-		return QueryContext{
-			key:       nil,
-			publicKey: publicKey,
-		}
+		return nil, ResponseContext{}, err
 	}
-	return QueryContext{
-		key:       responseKey,
-		publicKey: publicKey,
+
+	if !validateMessagePadding(query.Padding) {
+		return nil, ResponseContext{}, errors.New("invalid padding")
 	}
+
+	responseContext := ResponseContext{
+		odohSecret: odohSecret,
+		suite:      suite,
+		query:      query.Marshal(),
+	}
+
+	return query, responseContext, nil
 }
 
-func SealQuery(dnsQuery []byte, publicKey ObliviousDNSPublicKey) ([]byte, QueryContext, error) {
-	queryContext := createQueryContext(publicKey)
-	odohQuery := ObliviousDNSQuery{
-		ResponseKey: queryContext.key,
-		DnsMessage:  dnsQuery,
-	}
+func SealQuery(dnsQuery []byte, publicKey ObliviousDoHConfigContents) (ObliviousDNSMessage, QueryContext, error) {
+	odohQuery := CreateObliviousDNSQuery(dnsQuery, 0)
 
-	odnsMessage, err := queryContext.publicKey.EncryptQuery(odohQuery)
+	odohMessage, queryContext, err := publicKey.EncryptQuery(odohQuery)
 	if err != nil {
-		log.Fatalf("Unable to Encrypt oDoH Question with provided Public Key of Resolver")
-		return nil, queryContext, err
+		return ObliviousDNSMessage{}, QueryContext{}, err
 	}
 
-	return odnsMessage.Marshal(), queryContext, nil
+	return odohMessage, queryContext, nil
 }
 
-func (c QueryContext) OpenAnswer(encryptedDnsAnswer []byte) ([]byte, error) {
-	message := CreateObliviousDNSMessage(ResponseType, []byte{}, encryptedDnsAnswer)
-	odohResponse := ObliviousDNSResponse{ResponseKey: c.key}
-	responseMessageType := message.MessageType
-	if responseMessageType != ResponseType {
-		return nil, errors.New("answer is not a valid response type")
+func (c QueryContext) OpenAnswer(message ObliviousDNSMessage) ([]byte, error) {
+	if message.MessageType != ResponseType {
+		return nil, errors.New("message is not a response")
 	}
-	encryptedResponse := message.EncryptedMessage
 
-	responseKeyId := []byte{0x00, 0x00}
-	aad := append([]byte{0x02}, responseKeyId...) // message_type = 0x02, with an empty keyID
-
-	suite, err := hpke.AssembleCipherSuite(c.publicKey.KemID, c.publicKey.KdfID, c.publicKey.AeadID)
-
-	decryptedResponse, err := odohResponse.DecryptResponse(suite, aad, encryptedResponse)
+	decryptedResponseBytes, err := c.DecryptResponse(message)
 	if err != nil {
 		return nil, errors.New("unable to decrypt the obtained response using the symmetric key sent")
 	}
-	return decryptedResponse, nil
+
+	decryptedResponse, err := UnmarshalResponseBody(decryptedResponseBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptedResponse.DnsMessage, nil
 }

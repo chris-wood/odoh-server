@@ -41,15 +41,22 @@ const (
 	aeadID = hpke.AEAD_AESGCM128
 
 	// HTTP constants. Fill in your proxy and target here.
+	defaultPort = "8080"
 	proxyURI          = "https://dnstarget.example.net"
 	targetURI         = "https://dnsproxy.example.net"
 	queryEndpoint     = "/dns-query"
 	proxyEndpoint     = "/proxy"
 	healthEndpoint    = "/health"
-	publicKeyEndpoint = "/pk"
+	configEndpoint 	  = "/.well-known/odohconfig"
 
 	// WebPvD configuration. Fill in your values here.
 	webPvDString = `"{ "identifier" : "github.com", "expires" : "2019-08-23T06:00:00Z", "prefixes" : [ ], "dnsZones" : [ "odoh.example.net" ] }"`
+
+	// Environment variables
+	secretSeedEnvironmentVariable = "SEED_SECRET_KEY"
+	targetNameEnvironmentVariable = "TARGET_INSTANCE_NAME"
+	experimentIDEnvironmentVariable = "EXPERIMENT_ID"
+	telemetryTypeEnvironmentVariable = "TELEMETRY_TYPE"
 )
 
 var (
@@ -81,26 +88,24 @@ func (s odohServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
-		log.Printf("Defaulting to port %s", port)
+		port = defaultPort
 	}
 
 	var seed []byte
-	if seedHex := os.Getenv("SEED_SECRET_KEY"); seedHex != "" {
+	if seedHex := os.Getenv(secretSeedEnvironmentVariable); seedHex != "" {
 		log.Printf("Using Secret Key Seed : [%v]", seedHex)
 		var err error
 		seed, err = hex.DecodeString(seedHex)
 		if err != nil {
-			log.Printf("Unable to decode hex string to byte array. %v", err)
+			panic(err)
 		}
 	} else {
 		seed = make([]byte, 16)
 		rand.Read(seed)
-		log.Printf("Generating a random seed for KeyPair")
 	}
 
 	var serverName string
-	if serverNameSetting := os.Getenv("TARGET_INSTANCE_NAME"); serverNameSetting != "" {
+	if serverNameSetting := os.Getenv(targetNameEnvironmentVariable); serverNameSetting != "" {
 		serverName = serverNameSetting
 	} else {
 		serverName = "server_target_localhost"
@@ -108,16 +113,16 @@ func main() {
 	log.Printf("Setting Server Name as %v", serverName)
 
 	var experimentID string
-	if experimentID := os.Getenv("EXPERIMENT_ID"); experimentID == "" {
+	if experimentID := os.Getenv(experimentIDEnvironmentVariable); experimentID == "" {
 		experimentID = "EXP_LOCAL"
 	}
 
 	var telemetryType string
-	if telemetryType := os.Getenv("TELEMETRY_TYPE"); telemetryType == "" {
+	if telemetryType := os.Getenv(telemetryTypeEnvironmentVariable); telemetryType == "" {
 		telemetryType = "LOG"
 	}
 
-	privateKey, err := odoh.DeriveFixedKeyPairFromSeed(kemID, kdfID, aeadID, seed)
+	keyPair, err := odoh.CreateKeyPairFromSeed(kemID, kdfID, aeadID, seed)
 	if err != nil {
 		log.Fatal("Failed to create a private key. Exiting now.")
 	}
@@ -126,7 +131,7 @@ func main() {
 	endpoints["Target"] = queryEndpoint
 	endpoints["Proxy"] = proxyEndpoint
 	endpoints["Health"] = healthEndpoint
-	endpoints["PublicKey"] = publicKeyEndpoint
+	endpoints["Config"] = configEndpoint
 
 	resolversInUse := make([]*targetResolver, len(nameServers))
 
@@ -139,9 +144,9 @@ func main() {
 	}
 
 	target := &targetServer{
-		verbose:            true,
+		verbose:            false,
 		resolver:           resolversInUse,
-		odohKeyPair:        privateKey,
+		odohKeyPair:        keyPair,
 		telemetryClient:    getTelemetryInstance(telemetryType),
 		serverInstanceName: serverName,
 		experimentId:       experimentID,
@@ -165,7 +170,7 @@ func main() {
 	http.HandleFunc(queryEndpoint, target.targetQueryHandler)
 	http.HandleFunc(proxyEndpoint, proxy.proxyQueryHandler)
 	http.HandleFunc(healthEndpoint, server.healthCheckHandler)
-	http.HandleFunc(publicKeyEndpoint, target.publicKeyEndpointHandler)
+	http.HandleFunc(configEndpoint, target.configHandler)
 	http.HandleFunc("/", server.indexHandler)
 
 	log.Printf("Listening on port %v\n", port)
