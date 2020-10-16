@@ -2,19 +2,10 @@ module github.com/chris-wood/odoh-server
 
 go 1.14
 
-// +heroku goVersion go1.14
-// +scalingo goVersion go1.14
-
 require (
-	cloud.google.com/go v0.61.0 // indirect
-	cloud.google.com/go/logging v1.0.0
-	github.com/chris-wood/odoh v0.0.0-20201009212040-8b3f18f7fb29
-	github.com/cisco/go-hpke v0.0.0-20200904203048-9e7d3e90b7c3
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.0.0-20200716073932-4f0b75746dc1
-	github.com/google/go-cmp v0.5.1 // indirect
+	cloud.google.com/go/logging v1.1.0
+	github.com/chris-wood/odoh v0.1.2
+	github.com/cisco/go-hpke v0.0.0-20201008152537-a07eeccbf5d5
+	github.com/elastic/go-elasticsearch/v8 v8.0.0-20201007143536-4b4020669208
 	github.com/miekg/dns v1.1.31
-	golang.org/x/sys v0.0.0-20200728102440-3e129f6d46b1 // indirect
-	google.golang.org/genproto v0.0.0-20200730144737-007c33dbd381 // indirect
-	google.golang.org/grpc v1.31.0 // indirect
 )

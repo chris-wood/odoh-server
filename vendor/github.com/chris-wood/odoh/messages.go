@@ -76,10 +76,10 @@ type ObliviousDNSQuery struct {
 	ObliviousDNSMessageBody
 }
 
-func CreateObliviousDNSQuery(query []byte, paddingBytes int) *ObliviousDNSQuery {
+func CreateObliviousDNSQuery(query []byte, paddingBytes uint16) *ObliviousDNSQuery {
 	msg := ObliviousDNSMessageBody{
 		DnsMessage: query,
-		Padding:    make([]byte, paddingBytes),
+		Padding:    make([]byte, int(paddingBytes)),
 	}
 	return &ObliviousDNSQuery{
 		msg,
@@ -99,10 +99,10 @@ type ObliviousDNSResponse struct {
 	ObliviousDNSMessageBody
 }
 
-func CreateObliviousDNSResponse(response []byte, paddingBytes int) *ObliviousDNSResponse {
+func CreateObliviousDNSResponse(response []byte, paddingBytes uint16) *ObliviousDNSResponse {
 	msg := ObliviousDNSMessageBody{
 		DnsMessage: response,
-		Padding:    make([]byte, paddingBytes),
+		Padding:    make([]byte, int(paddingBytes)),
 	}
 	return &ObliviousDNSResponse{
 		msg,
