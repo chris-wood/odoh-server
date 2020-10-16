@@ -37,7 +37,7 @@ import (
 type targetServer struct {
 	verbose            bool
 	resolver           []*targetResolver
-	odohKeyPair        odoh.ObliviousDNSKeyPair
+	odohKeyPair        odoh.ObliviousDoHKeyPair
 	telemetryClient    *telemetry
 	serverInstanceName string
 	experimentId       string
@@ -119,8 +119,6 @@ func (s *targetServer) resolveQueryWithResolver(query *dns.Msg, resolver *target
 		log.Printf("Query=%s\n", packedQuery)
 	}
 
-	log.Printf("Resolving query using %v", resolver.getResolverServerName())
-
 	start := time.Now()
 	response, err := resolver.resolve(query)
 	elapsed := time.Now().Sub(start)
@@ -184,53 +182,32 @@ func (s *targetServer) plainQueryHandler(w http.ResponseWriter, r *http.Request)
 	w.Write(packedResponse)
 }
 
-func (s *targetServer) parseObliviousQueryFromRequest(r *http.Request) (*odoh.ObliviousDNSQuery, error) {
+func (s *targetServer) parseObliviousQueryFromRequest(r *http.Request) (*odoh.ObliviousDNSQuery, odoh.ResponseContext, error) {
 	defer r.Body.Close()
 	encryptedMessageBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Println("Failed reading oblivious query body:", err)
-		return nil, err
+		return nil, odoh.ResponseContext{}, err
 	}
 
 	obliviousMessage, err := odoh.UnmarshalDNSMessage(encryptedMessageBytes)
 	if err != nil {
 		log.Println("Failed decoding oblivious DNS message:", err)
-		return nil, err
+		return nil, odoh.ResponseContext{},err
 	}
 
-	if obliviousMessage.Type() != odoh.QueryType {
-		log.Printf("Invalid Oblivious DNS message type: expected %d, got %d\n", odoh.QueryType, obliviousMessage.Type())
-		return nil, err
-	}
-
-	obliviousQuery, err := s.odohKeyPair.DecryptQuery(*obliviousMessage)
-	if err != nil {
-		log.Println("Failed decrypting oblivious query body:", err)
-		return nil, err
-	}
-
-	return obliviousQuery, nil
+	return s.odohKeyPair.DecryptQuery(obliviousMessage)
 }
 
-func (s *targetServer) createObliviousResponseForQuery(query *odoh.ObliviousDNSQuery, response []byte) (*odoh.ObliviousDNSMessage, error) {
-	suite, err := s.odohKeyPair.CipherSuite()
-	if err != nil {
-		log.Println("Failed building HPKE ciphersuite:", err)
-		return nil, err
-	}
-
-	responseKeyId := []byte{0x00, 0x00}
-	aad := append([]byte{byte(odoh.ResponseType)}, responseKeyId...) // message_type = 0x02, with an empty keyID
-	encryptedResponse, err := query.EncryptResponse(suite, aad, response)
-	if err != nil {
-		return nil, err
-	}
+func (s *targetServer) createObliviousResponseForQuery(context odoh.ResponseContext, dnsResponse []byte) (odoh.ObliviousDNSMessage, error) {
+	response := odoh.CreateObliviousDNSResponse(dnsResponse, 0)
+	odohResponse, err := context.EncryptResponse(response)
 
 	if s.verbose {
-		log.Printf("Encrypted response: %x", encryptedResponse)
+		log.Printf("Encrypted response: %x", odohResponse)
 	}
 
-	return odoh.CreateObliviousDNSMessage(odoh.ResponseType, []byte{}, encryptedResponse), nil
+	return odohResponse, err
 }
 
 func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Request) {
@@ -242,13 +219,11 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 	timestamp := runningTime{}
 
 	timestamp.Start = requestReceivedTime.UnixNano()
-	obliviousQuery, err := s.parseObliviousQueryFromRequest(r)
+	obliviousQuery, responseContext, err := s.parseObliviousQueryFromRequest(r)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	exp.RequestID = obliviousQuery.ResponseKey
-	chosenResolver := int(obliviousQuery.ResponseKey[len(obliviousQuery.ResponseKey)-1]) % len(nameServers)
 
 	query, err := decodeDNSQuestion(obliviousQuery.Message())
 	if err != nil {
@@ -260,6 +235,7 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 	queryParseAndDecryptionCompleteTime := time.Now().UnixNano()
 	timestamp.TargetQueryDecryptionTime = queryParseAndDecryptionCompleteTime
 
+	chosenResolver := int(query.Id) % len(nameServers)
 	resolverChosen := s.resolver[chosenResolver]
 	packedResponse, err := s.resolveQueryWithResolver(query, resolverChosen)
 	if err != nil {
@@ -271,7 +247,7 @@ func (s *targetServer) obliviousQueryHandler(w http.ResponseWriter, r *http.Requ
 	queryResolutionCompleteTime := time.Now().UnixNano()
 	timestamp.TargetQueryResolutionTime = queryResolutionCompleteTime
 
-	obliviousResponse, err := s.createObliviousResponseForQuery(obliviousQuery, packedResponse)
+	obliviousResponse, err := s.createObliviousResponseForQuery(responseContext, packedResponse)
 	if err != nil {
 		log.Println("Failed creating DNS oblivious DNS response:", err)
 		timestamp.TargetAnswerEncryptionTime = 0
@@ -338,9 +314,9 @@ func (s *targetServer) targetQueryHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *targetServer) publicKeyEndpointHandler(w http.ResponseWriter, r *http.Request) {
+func (s *targetServer) configHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
-	pkBytes := s.odohKeyPair.PublicKey.Marshal()
 
-	w.Write(pkBytes)
+	configBytes := s.odohKeyPair.Config.Marshal()
+	w.Write(configBytes)
 }

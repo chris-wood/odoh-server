@@ -1,4 +1,4 @@
-// Code generated from specification version 8.0.0 (fe609f0ee5d): DO NOT EDIT
+// Code generated from specification version 8.0.0 (ad69694863a): DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,7 @@ type API struct {
 	AutoscalingPutAutoscalingPolicy               AutoscalingPutAutoscalingPolicy
 	Bulk                                          Bulk
 	ClearScroll                                   ClearScroll
+	ClosePointInTime                              ClosePointInTime
 	Count                                         Count
 	Create                                        Create
 	DanglingIndicesDeleteDanglingIndex            DanglingIndicesDeleteDanglingIndex
@@ -74,6 +75,7 @@ type API struct {
 	Msearch                                       Msearch
 	MsearchTemplate                               MsearchTemplate
 	Mtermvectors                                  Mtermvectors
+	OpenPointInTime                               OpenPointInTime
 	Ping                                          Ping
 	PutScript                                     PutScript
 	RankEval                                      RankEval
@@ -185,7 +187,6 @@ type Indices struct {
 	Freeze                IndicesFreeze
 	GetAlias              IndicesGetAlias
 	GetDataStream         IndicesGetDataStream
-	GetDataStreams        IndicesGetDataStreams
 	GetFieldMapping       IndicesGetFieldMapping
 	GetIndexTemplate      IndicesGetIndexTemplate
 	GetMapping            IndicesGetMapping
@@ -468,6 +469,7 @@ func New(t Transport) *API {
 		AutoscalingPutAutoscalingPolicy:               newAutoscalingPutAutoscalingPolicyFunc(t),
 		Bulk:                                          newBulkFunc(t),
 		ClearScroll:                                   newClearScrollFunc(t),
+		ClosePointInTime:                              newClosePointInTimeFunc(t),
 		Count:                                         newCountFunc(t),
 		Create:                                        newCreateFunc(t),
 		DanglingIndicesDeleteDanglingIndex:            newDanglingIndicesDeleteDanglingIndexFunc(t),
@@ -509,6 +511,7 @@ func New(t Transport) *API {
 		Msearch:                                       newMsearchFunc(t),
 		MsearchTemplate:                               newMsearchTemplateFunc(t),
 		Mtermvectors:                                  newMtermvectorsFunc(t),
+		OpenPointInTime:                               newOpenPointInTimeFunc(t),
 		Ping:                                          newPingFunc(t),
 		PutScript:                                     newPutScriptFunc(t),
 		RankEval:                                      newRankEvalFunc(t),
@@ -613,7 +616,6 @@ func New(t Transport) *API {
 			Freeze:                newIndicesFreezeFunc(t),
 			GetAlias:              newIndicesGetAliasFunc(t),
 			GetDataStream:         newIndicesGetDataStreamFunc(t),
-			GetDataStreams:        newIndicesGetDataStreamsFunc(t),
 			GetFieldMapping:       newIndicesGetFieldMappingFunc(t),
 			GetIndexTemplate:      newIndicesGetIndexTemplateFunc(t),
 			GetMapping:            newIndicesGetMappingFunc(t),

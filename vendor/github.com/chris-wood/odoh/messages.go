@@ -23,11 +23,8 @@
 package odoh
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"encoding/binary"
 	"fmt"
-	"github.com/cisco/go-hpke"
 )
 
 type ObliviousMessageType uint8
@@ -37,80 +34,97 @@ const (
 	ResponseType ObliviousMessageType = 0x02
 )
 
-type ObliviousDNSQuery struct {
-	ResponseKey []byte
-	DnsMessage  []byte
+//
+// struct {
+//    opaque dns_message<1..2^16-1>;
+//    opaque padding<0..2^16-1>;
+// } ObliviousDoHQueryBody;
+//
+type ObliviousDNSMessageBody struct {
+	DnsMessage []byte
+	Padding    []byte
 }
 
-func (m ObliviousDNSQuery) Marshal() []byte {
-	result := encodeLengthPrefixedSlice(m.ResponseKey)
-	result = append(result, encodeLengthPrefixedSlice(m.DnsMessage)...)
-	return result
+func (m ObliviousDNSMessageBody) Marshal() []byte {
+	return append(encodeLengthPrefixedSlice(m.DnsMessage), encodeLengthPrefixedSlice(m.Padding)...)
 }
 
-func UnmarshalQueryBody(data []byte) (*ObliviousDNSQuery, error) {
-	keyLength := binary.BigEndian.Uint16(data)
-	if int(2+keyLength) > len(data) {
-		return nil, fmt.Errorf("Invalid key length")
+func UnmarshalMessageBody(data []byte) (ObliviousDNSMessageBody, error) {
+	messageLength := binary.BigEndian.Uint16(data)
+	if int(2+messageLength) > len(data) {
+		return ObliviousDNSMessageBody{}, fmt.Errorf("Invalid DNS message length")
 	}
-	key := data[2 : 2+keyLength]
+	message := data[2 : 2+messageLength]
 
-	messageLength := binary.BigEndian.Uint16(data[2+keyLength:])
-	if int(2+keyLength+2+messageLength) > len(data) {
-		return nil, fmt.Errorf("Invalid DNS message length")
+	paddingLength := binary.BigEndian.Uint16(data[2+messageLength:])
+	if int(2+messageLength+2+paddingLength) > len(data) {
+		return ObliviousDNSMessageBody{}, fmt.Errorf("Invalid DNS padding length")
 	}
 
-	message := data[2+keyLength+2 : 2+keyLength+2+messageLength]
-
-	return &ObliviousDNSQuery{
-		ResponseKey: key,
-		DnsMessage:  message,
+	padding := data[2+messageLength+2 : 2+messageLength+2+paddingLength]
+	return ObliviousDNSMessageBody{
+		DnsMessage: message,
+		Padding:    padding,
 	}, nil
 }
 
-func (m ObliviousDNSQuery) Message() []byte {
+func (m ObliviousDNSMessageBody) Message() []byte {
 	return m.DnsMessage
 }
 
-func (m ObliviousDNSQuery) EncryptResponse(suite hpke.CipherSuite, aad, response []byte) ([]byte, error) {
-	// TODO(caw): we need to support other ciphersuites, so dispatch on `suite`
-	block, err := aes.NewCipher(m.ResponseKey)
+type ObliviousDNSQuery struct {
+	ObliviousDNSMessageBody
+}
+
+func CreateObliviousDNSQuery(query []byte, paddingBytes uint16) *ObliviousDNSQuery {
+	msg := ObliviousDNSMessageBody{
+		DnsMessage: query,
+		Padding:    make([]byte, int(paddingBytes)),
+	}
+	return &ObliviousDNSQuery{
+		msg,
+	}
+}
+
+func UnmarshalQueryBody(data []byte) (*ObliviousDNSQuery, error) {
+	msg, err := UnmarshalMessageBody(data)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := make([]byte, suite.AEAD.NonceSize())
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	ciphertext := aesgcm.Seal(nil, nonce, response, aad)
-
-	return ciphertext, nil
+	return &ObliviousDNSQuery{msg}, nil
 }
 
 type ObliviousDNSResponse struct {
-	ResponseKey []byte
+	ObliviousDNSMessageBody
 }
 
-func (r ObliviousDNSResponse) DecryptResponse(suite hpke.CipherSuite, aad, response []byte) ([]byte, error) {
-	// TODO(caw): we need to support other ciphersuites, so dispatch on `suite`
-	block, err := aes.NewCipher(r.ResponseKey)
+func CreateObliviousDNSResponse(response []byte, paddingBytes uint16) *ObliviousDNSResponse {
+	msg := ObliviousDNSMessageBody{
+		DnsMessage: response,
+		Padding:    make([]byte, int(paddingBytes)),
+	}
+	return &ObliviousDNSResponse{
+		msg,
+	}
+}
+
+func UnmarshalResponseBody(data []byte) (*ObliviousDNSResponse, error) {
+	msg, err := UnmarshalMessageBody(data)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := make([]byte, suite.AEAD.NonceSize())
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	plaintext, err := aesgcm.Open(nil, nonce, response, aad)
-	return plaintext, err
+	return &ObliviousDNSResponse{msg}, nil
 }
 
+//
+// struct {
+//    uint8  message_type;
+//    opaque key_id<0..2^16-1>;
+//    opaque encrypted_message<1..2^16-1>;
+// } ObliviousDoHMessage;
+//
 type ObliviousDNSMessage struct {
 	MessageType      ObliviousMessageType
 	KeyID            []byte
@@ -139,22 +153,22 @@ func (m ObliviousDNSMessage) Marshal() []byte {
 	return result
 }
 
-func UnmarshalDNSMessage(data []byte) (*ObliviousDNSMessage, error) {
+func UnmarshalDNSMessage(data []byte) (ObliviousDNSMessage, error) {
 	if len(data) < 1 {
-		return nil, fmt.Errorf("Invalid data length: %d", len(data))
+		return ObliviousDNSMessage{}, fmt.Errorf("Invalid data length: %d", len(data))
 	}
 
 	messageType := data[0]
-	keyID, offset, err := decodeLengthPrefixedSlice(data[1:])
+	keyID, messageOffset, err := decodeLengthPrefixedSlice(data[1:])
 	if err != nil {
-		return nil, err
+		return ObliviousDNSMessage{}, err
 	}
-	encryptedMessage, offset, err := decodeLengthPrefixedSlice(data[1+offset:])
+	encryptedMessage, _, err := decodeLengthPrefixedSlice(data[1+messageOffset:])
 	if err != nil {
-		return nil, err
+		return ObliviousDNSMessage{}, err
 	}
 
-	return &ObliviousDNSMessage{
+	return ObliviousDNSMessage{
 		MessageType:      ObliviousMessageType(messageType),
 		KeyID:            keyID,
 		EncryptedMessage: encryptedMessage,

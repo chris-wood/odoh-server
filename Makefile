@@ -1,6 +1,9 @@
 test:
 	go test ./...
 
+all:
+	go build
+
 logs-target:
 	gcloud app logs tail -s odoh-target
 
