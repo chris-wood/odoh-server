@@ -317,6 +317,7 @@ func (s *targetServer) targetQueryHandler(w http.ResponseWriter, r *http.Request
 func (s *targetServer) configHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s Handling %s\n", r.Method, r.URL.Path)
 
-	configBytes := s.odohKeyPair.Config.Marshal()
-	w.Write(configBytes)
+	configSet := []odoh.ObliviousDoHConfig{s.odohKeyPair.Config}
+	configs := odoh.CreateObliviousDoHConfigs(configSet)
+	w.Write(configs.Marshal())
 }

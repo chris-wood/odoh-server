@@ -47,7 +47,7 @@ const (
 	queryEndpoint     = "/dns-query"
 	proxyEndpoint     = "/proxy"
 	healthEndpoint    = "/health"
-	configEndpoint 	  = "/.well-known/odohconfig"
+	configEndpoint 	  = "/.well-known/odohconfigs"
 
 	// WebPvD configuration. Fill in your values here.
 	webPvDString = `"{ "identifier" : "github.com", "expires" : "2019-08-23T06:00:00Z", "prefixes" : [ ], "dnsZones" : [ "odoh.example.net" ] }"`
